@@ -1,0 +1,2785 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>En vecka i Österlen</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<meta name="theme-color" content="#a9754a">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Österlen">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+  :root{
+    --cork: #a9754a;
+    --cork-dark: #8f6039;
+    --card: #fdf6e6;
+    --card-edge: #ecdfc0;
+    --ink: #2e2418;
+    --ink-soft: #5c4c38;
+    --pin: #c1443a;
+    --pin-dark: #8f2e26;
+    --tape: rgba(255,244,214,0.75);
+    --accent: #2f6f5e;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    min-height:100vh;
+    overflow-x:hidden;
+    font-family:'Inter', system-ui, sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(circle at 20% 15%, rgba(255,255,255,0.5), transparent 40%),
+      radial-gradient(circle at 80% 85%, rgba(0,0,0,0.02), transparent 45%),
+      #eee7db;
+    background-attachment:fixed;
+  }
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background-image:
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.02) 0px, transparent 2px, transparent 4px),
+      repeating-linear-gradient(90deg, rgba(0,0,0,0.015) 0px, transparent 3px, transparent 5px);
+    pointer-events:none;
+  }
+  h1{font-family:'Kalam', cursive; font-weight:700; margin:0;}
+  h2,h3{font-family:'Inter', system-ui, sans-serif; font-weight:600; margin:0; letter-spacing:-0.01em;}
+
+  /* --- Lock screen --- */
+  #lock-screen{
+    min-height:100vh;
+    display:flex; align-items:center; justify-content:center;
+    padding:24px; position:relative; z-index:1;
+  }
+  .lock-card{
+    background:var(--card);
+    border:1px solid var(--card-edge);
+    border-radius:16px;
+    box-shadow:0 20px 50px rgba(0,0,0,0.28);
+    padding:44px 36px 36px;
+    width:100%; max-width:360px;
+    text-align:center;
+    position:relative;
+  }
+  .lock-icon{
+    width:52px; height:52px; border-radius:50%;
+    background:linear-gradient(135deg, var(--accent), #244f42);
+    display:flex; align-items:center; justify-content:center;
+    margin:0 auto 18px;
+    box-shadow:0 6px 14px rgba(47,111,94,0.35);
+  }
+  .lock-card h1{font-size:24px; margin-bottom:6px; font-family:'Kalam', cursive;}
+  .lock-card p{color:var(--ink-soft); font-size:14px; margin:0 0 24px;}
+  #password{
+    width:100%; padding:12px 14px; font-size:15px;
+    border:1px solid var(--card-edge); border-radius:8px;
+    background:#fffdf8; color:var(--ink);
+    font-family:'Inter', sans-serif;
+    transition:border-color 0.15s ease;
+  }
+  #password:focus{outline:none; border-color:var(--accent); box-shadow:0 0 0 3px rgba(47,111,94,0.15);}
+  #unlock-btn{
+    margin-top:14px; width:100%; padding:12px; font-size:15px; font-weight:600;
+    border:none; border-radius:8px; cursor:pointer;
+    background:var(--accent); color:#fdf6e6;
+    font-family:'Inter', sans-serif;
+    transition:background 0.15s ease, transform 0.1s ease;
+  }
+  #unlock-btn:hover{background:#264f42;}
+  #unlock-btn:active{transform:scale(0.98);}
+  #lock-error{color:var(--pin-dark); font-size:13px; margin-top:12px; min-height:16px; font-weight:600;}
+  .shake{animation:shake 0.4s;}
+  @keyframes shake{
+    0%,100%{transform:translateX(0);}
+    25%{transform:translateX(-6px);}
+    75%{transform:translateX(6px);}
+  }
+
+  /* --- Board --- */
+  #board{display:none; position:relative; z-index:1; max-width:1000px; margin:0 auto; padding:32px 20px 60px;}
+  header.board-head{
+    text-align:center; margin-bottom:32px; color:var(--ink);
+  }
+  .header-icon{display:block; margin:0 auto 6px;}
+  header.board-head h1{
+    font-size:36px; color:var(--ink); text-shadow:none;
+  }
+  header.board-head p{color:var(--ink-soft); margin-top:6px; font-size:14px;}
+  .header-pills{display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-top:16px;}
+  .trip-dates{
+    display:inline-block; padding:7px 16px; border-radius:16px;
+    background:rgba(253,246,230,0.92); color:var(--ink); font-weight:600; font-size:13.5px;
+    border:1px solid rgba(0,0,0,0.06);
+  }
+  #trip-map{height:340px; border-radius:10px; border:1px solid var(--card-edge); margin-bottom:8px; background:var(--card); overflow:hidden;}
+  .leaflet-container{width:100%; height:100%;}
+  .leaflet-attribution-flag{display:none !important;}
+  .leaflet-control-attribution img{width:auto !important; height:11px !important; vertical-align:middle;}
+  .map-hint{color:var(--ink-soft); font-size:12.5px; text-align:center; margin:0 0 14px;}
+  .weather-link{
+    display:inline-block; padding:7px 16px; border-radius:16px;
+    background:var(--card); color:var(--ink); font-size:13.5px; font-weight:500;
+    text-decoration:none; border:1px solid var(--card-edge);
+  }
+  .legend{
+    display:flex; flex-wrap:wrap; justify-content:center; gap:10px 16px;
+    margin:0 auto 26px; max-width:640px; font-size:12.5px; color:var(--ink-soft);
+  }
+  .legend span{display:inline-flex; align-items:center; gap:6px;}
+  .legend i{width:10px; height:10px; border-radius:50%; display:inline-block;}
+  .filters{display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin:0 0 20px;}
+  .filter-chip{
+    padding:6px 14px; border-radius:14px; border:1px solid var(--card-edge);
+    background:rgba(255,255,255,0.5); color:var(--ink-soft); font-size:13px; cursor:pointer; font-family:'Inter',sans-serif; font-weight:500;
+  }
+  .filter-chip.active{background:var(--accent); color:#fdf6e6; border-color:var(--accent);}
+  .act-card.hidden{display:none;}
+  .kids-filters{margin-top:6px;}
+  .kids-chip{
+    padding:5px 12px; border-radius:14px; border:1px solid var(--card-edge);
+    background:rgba(255,255,255,0.5); color:var(--ink-soft); font-size:12px; cursor:pointer; font-family:'Inter',sans-serif; font-weight:500;
+  }
+  .kids-chip.active{background:var(--accent); color:#fdf6e6; border-color:var(--accent);}
+  .kids-badge{
+    display:inline-flex; align-items:center; gap:5px; font-size:12px; padding:4px 10px;
+    border-radius:12px; margin:8px 0; font-weight:600;
+  }
+  .kids-badge.great{background:#eaf3de; color:#3b6d11;}
+  .kids-badge.good{background:#faeeda; color:#854f0b;}
+  .kids-badge.mixed{background:#f1efe8; color:#5f5e5a;}
+  .kids-note{font-size:12.5px; color:var(--ink-soft); margin:-4px 0 8px;}
+  .fav-btn{
+    background:none; border:none; cursor:pointer; font-size:16px; color:var(--pin);
+    padding:0 2px; line-height:1; display:inline-flex; align-items:center; gap:4px;
+  }
+  .fav-count{font-size:12px; color:var(--ink-soft); font-weight:600;}
+
+  .star-rating{display:flex; align-items:center; gap:2px;}
+  .star-rating button{
+    background:none; border:none; cursor:pointer; font-size:17px; padding:0 1px;
+    color:var(--card-edge); line-height:1;
+  }
+  .star-rating button.filled{color:#d99a2b;}
+  .star-avg{font-size:11.5px; color:var(--ink-soft); margin-left:6px; white-space:nowrap;}
+
+  .top-row{
+    display:flex; align-items:center; gap:12px; padding:10px 4px; border-bottom:1px solid var(--card-edge);
+  }
+  .top-rank{font-family:'Kalam',cursive; font-size:18px; color:var(--ink-soft); width:22px; flex-shrink:0;}
+  .top-name{flex:1; font-size:14px; font-weight:500;}
+  .top-badge{font-size:11px; color:var(--ink-soft);}
+  .top-score{font-size:13px; font-weight:600; color:var(--ink); white-space:nowrap;}
+
+  .whereis-card{
+    display:flex; align-items:flex-start; gap:10px; padding:10px 12px;
+    background:rgba(255,255,255,0.5); border-radius:3px; margin-bottom:8px;
+  }
+  .whereis-avatar{
+    width:32px; height:32px; border-radius:50%; background:var(--accent); color:#fdf6e6;
+    display:flex; align-items:center; justify-content:center; font-weight:600; font-size:13px; flex-shrink:0;
+  }
+  .whereis-name{font-weight:600; font-size:14px;}
+  .whereis-status{font-size:13.5px; color:var(--ink-soft); margin-top:2px;}
+  .whereis-time{font-size:11px; color:var(--ink-soft); margin-top:3px; font-style:italic;}
+  .whereis-del{margin-left:auto; background:none; border:none; color:var(--pin-dark); cursor:pointer; font-size:15px;}
+  #whereis-gps{
+    background:var(--accent); color:#fdf6e6; border:1px solid var(--accent);
+    font-weight:600; padding:8px 14px; border-radius:3px; cursor:pointer; font-family:'Inter',sans-serif; font-size:13px;
+  }
+  #whereis-gps:disabled{opacity:0.6; cursor:default;}
+  .whereis-gps-tag{font-size:11px; color:var(--accent); font-weight:600; margin-left:4px;}
+  .weather-section{margin-bottom:34px;}
+  .weather-section h2{color:var(--ink); text-align:center; margin-bottom:16px; font-size:21px; font-weight:600; text-shadow:none;}
+  .weather-row{display:grid; grid-template-columns:repeat(auto-fit, minmax(90px, 1fr)); gap:10px;}
+  .wx-card{
+    background:var(--card); border:1px solid var(--card-edge); border-radius:10px;
+    padding:12px 8px; text-align:center; box-shadow:0 2px 7px rgba(0,0,0,0.13);
+  }
+  .wx-day{font-weight:600; font-size:13px; margin-bottom:2px;}
+  .wx-date{font-size:11px; color:var(--ink-soft); margin-bottom:8px;}
+  .wx-desc{font-size:12px; color:var(--ink-soft); min-height:30px; display:flex; align-items:center; justify-content:center;}
+  .wx-temp{font-size:15px; font-weight:600; margin-top:4px;}
+  .wx-temp .lo{color:var(--ink-soft); font-weight:400;}
+  .wx-rain{font-size:11px; color:#2f6f9e; margin-top:2px;}
+  .weather-fallback{color:var(--ink-soft); font-size:13px; text-align:center;}
+  .weather-fallback a{color:var(--accent);}
+  .weather-note{color:var(--ink-soft); font-size:12px; text-align:left; margin-top:10px;}
+
+  .layout{display:grid; grid-template-columns:1fr 230px; gap:24px; align-items:start;}
+  .weather-sidebar{
+    background:var(--card); border:1px solid var(--card-edge); border-radius:10px;
+    padding:16px 14px; box-shadow:0 3px 10px rgba(0,0,0,0.15);
+  }
+  .weather-sidebar h2{color:var(--ink); text-align:left; font-size:19px; margin-bottom:12px; text-shadow:none;}
+  .weather-row{display:flex; flex-direction:column; gap:8px;}
+  .wx-card{
+    background:rgba(255,255,255,0.5); border:1px solid var(--card-edge); border-radius:10px;
+    padding:8px 10px; text-align:left;
+  }
+  .wx-card-top{display:flex; align-items:center; gap:10px;}
+  .wx-daydate{flex:0 0 42px; line-height:1.2;}
+  .wx-day{font-weight:600; font-size:13px;}
+  .wx-date{font-size:11px; color:var(--ink-soft);}
+  .wx-icon{flex:0 0 30px; display:flex; align-items:center; justify-content:center; filter:drop-shadow(0 1px 1px rgba(0,0,0,0.12));}
+  .wx-temp{margin-left:auto; font-size:15px; font-weight:600; text-align:right;}
+  .wx-temp .lo{color:var(--ink-soft); font-weight:400;}
+  .wx-stats{display:flex; flex-wrap:wrap; gap:5px; margin-top:6px; padding-left:42px;}
+  .wx-stat{font-size:10.5px; color:var(--ink-soft); display:inline-flex; align-items:center; gap:3px; background:rgba(255,255,255,0.6); border-radius:8px; padding:2px 6px;}
+  .wx-stat.wx-rain{color:#2f6f9e;}
+  .wx-stat.wx-uv{color:#fff; font-weight:700; background:#8a8020;}
+  @media(max-width:760px){
+    .layout{grid-template-columns:1fr;}
+  }
+  #refresh-note{
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    margin:0 auto 26px; max-width:520px;
+  }
+  #refresh-btn{
+    background:var(--tape); border:1px solid var(--card-edge); color:var(--ink);
+    padding:7px 16px; border-radius:3px; cursor:pointer; font-size:13px; font-family:'Inter',sans-serif; font-weight:500;
+  }
+  #refresh-btn:active{transform:scale(0.97);}
+
+  .grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(270px, 1fr)); gap:26px;}
+  .note{
+    background:var(--card); border:1px solid var(--card-edge);
+    border-radius:10px; padding:24px 20px 20px;
+    box-shadow:0 3px 10px rgba(0,0,0,0.16);
+    position:relative;
+  }
+  .note h2{font-size:21px; margin-bottom:14px; color:var(--ink);}
+  .note h2 i{font-style:normal; color:var(--accent); margin-right:6px;}
+
+  ul.list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; margin-bottom:14px; min-height:10px;}
+  .item{
+    display:flex; align-items:flex-start; gap:10px; padding:8px 10px;
+    background:rgba(255,255,255,0.5); border-radius:3px; font-size:14px; line-height:1.4;
+  }
+  .item input[type=checkbox]{margin-top:3px; width:15px; height:15px; accent-color:var(--accent); flex-shrink:0;}
+  .item.done span.txt{text-decoration:line-through; color:var(--ink-soft);}
+  .item .txt{flex:1; word-break:break-word;}
+  .item .meta{font-size:12px; color:var(--ink-soft); display:block;}
+  .item input[type=date].sched-date-input{
+    flex:0 0 120px; padding:4px 6px; font-size:12px; border:1px solid var(--card-edge);
+    border-radius:3px; background:#fffdf8; color:var(--ink); font-family:'Inter',sans-serif;
+  }
+  .del{
+    background:none; border:none; color:var(--pin-dark); cursor:pointer; font-size:15px;
+    padding:0 2px; line-height:1; flex-shrink:0;
+  }
+  .empty-hint{font-size:13px; color:var(--ink-soft); font-style:italic; padding:6px 2px;}
+
+  .shopping-note{grid-column: span 1;}
+  .shop-group{margin-bottom:12px;}
+  .shop-group-title{
+    font-size:12px; font-weight:600; color:var(--accent); text-transform:uppercase;
+    letter-spacing:0.03em; margin:0 0 6px 2px;
+  }
+  .shop-item{
+    display:flex; align-items:center; gap:8px; padding:6px 8px;
+    background:rgba(255,255,255,0.5); border-radius:3px; font-size:14px; margin-bottom:5px;
+  }
+  .shop-item input[type=checkbox]{width:15px; height:15px; accent-color:var(--accent); flex-shrink:0;}
+  .shop-item.done .txt{text-decoration:line-through; color:var(--ink-soft);}
+  .shop-item .txt{flex:1; word-break:break-word;}
+  .shopping-hint{font-size:12px; color:var(--ink-soft); margin-top:8px; font-style:italic;}
+
+  .bike-section{margin-bottom:34px;}
+  .bike-section h2{color:var(--ink); text-align:center; margin-bottom:16px; font-size:21px; font-weight:600; text-shadow:none;}
+  .bike-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px;}
+  .journey-options{display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px; margin-top:6px;}
+  .bike-card{
+    background:var(--card); border:1px solid var(--card-edge); border-radius:10px;
+    padding:18px 18px 16px; box-shadow:0 3px 10px rgba(0,0,0,0.15);
+  }
+  .bike-card h3{font-family:'Kalam',cursive; font-size:19px; margin-bottom:6px; color:var(--ink);}
+  .bike-meta{display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;}
+  .bike-meta span{font-size:12px; background:var(--tape); border:1px solid var(--card-edge); padding:3px 10px; border-radius:12px; color:var(--ink-soft);}
+  .bike-card p{font-size:13.5px; color:var(--ink-soft); line-height:1.6; margin:0 0 12px;}
+  .bike-actions{display:flex; gap:8px; flex-wrap:wrap;}
+  .bike-actions a{
+    font-size:12.5px; padding:7px 12px; border-radius:3px; text-decoration:none;
+    border:1px solid var(--card-edge); background:rgba(255,255,255,0.6); color:var(--ink); font-weight:500;
+  }
+  .bike-actions a.primary{background:var(--accent); color:#fdf6e6; border-color:var(--accent);}
+  .bike-actions button.gpx-dl{
+    font-size:12.5px; padding:7px 12px; border-radius:3px; cursor:pointer;
+    border:1px solid var(--card-edge); background:rgba(255,255,255,0.6); color:var(--ink); font-weight:500;
+    font-family:'Inter',sans-serif;
+  }
+  .bike-actions button.gpx-dl:hover{background:rgba(255,255,255,0.85);}
+  .bike-map{height:260px; border-radius:10px; border:1px solid var(--card-edge); margin-bottom:10px; background:var(--card); overflow:hidden;}
+
+  .bornholm-note{grid-column: span 1;}
+  .bornholm-note .bh-schedule{list-style:none; margin:0 0 12px; padding:0; font-size:13.5px; color:var(--ink-soft); line-height:1.7;}
+  .bornholm-note .bh-schedule li{display:flex; gap:8px;}
+  .bornholm-note .bh-schedule b{color:var(--ink); flex-shrink:0; min-width:52px;}
+  .bornholm-note p{font-size:13px; color:var(--ink-soft); line-height:1.6; margin:0 0 10px;}
+  .bornholm-note a{color:var(--accent); font-weight:600;}
+
+  .add-row{display:flex; gap:6px; flex-wrap:wrap;}
+  .add-row input, .add-row textarea{
+    flex:1; min-width:100px; padding:8px 10px; font-size:13px;
+    border:1px solid var(--card-edge); border-radius:3px; background:#fffdf8;
+    font-family:'Inter', sans-serif; color:var(--ink);
+  }
+  .add-row input[type=date]{flex:0 0 130px;}
+  .add-row button{
+    padding:8px 14px; border:none; border-radius:3px; background:var(--accent);
+    color:#fdf6e6; font-weight:600; cursor:pointer; font-size:13px; font-family:'Inter',sans-serif;
+  }
+  .add-row button:active{transform:scale(0.97);}
+
+  .activities{margin-bottom:34px; min-width:0;}
+  .weather-sidebar{min-width:0;}
+  .activities h2{color:var(--ink); text-align:center; margin-bottom:18px; font-size:21px; font-weight:600; text-shadow:none;}
+  .activity-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px;}
+  .act-card{
+    background:var(--card); border:1px solid var(--card-edge); border-radius:10px;
+    box-shadow:0 3px 10px rgba(0,0,0,0.15); overflow:hidden;
+  }
+  .act-head{
+    display:flex; align-items:center; gap:10px; padding:14px 16px; cursor:pointer;
+    background:transparent; border:none; width:100%; text-align:left; font-family:'Inter',sans-serif;
+  }
+  .act-head:active{background:rgba(0,0,0,0.03);}
+  .act-name{font-weight:600; font-size:15px; color:var(--ink); flex:1;}
+  .act-chevron{transition:transform 0.2s; color:var(--ink-soft); font-size:14px;}
+  .act-card.open .act-chevron{transform:rotate(180deg);}
+  .badge{
+    font-size:11px; font-weight:600; padding:3px 9px; border-radius:12px; white-space:nowrap;
+    color:#fff;
+  }
+  .badge.water{background:#2f6f9e;}
+  .badge.nature{background:#3b7a3f;}
+  .badge.food{background:#b5762a;}
+  .badge.grocery{background:#5c7a3f;}
+  .badge.history{background:#6b4f9e;}
+  .badge.play{background:#c1447a;}
+  .badge.rain{background:#6b6357;}
+  .badge.active{background:var(--pin-dark);}
+  .act-body{display:none; padding:0 16px 16px; font-size:13.5px; color:var(--ink-soft); line-height:1.6;}
+  .act-card.open .act-body{display:block;}
+  .act-meta{font-size:12.5px; color:var(--ink-soft); margin-top:8px;}
+  .act-actions{display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;}
+  .act-actions a, .act-actions button{
+    font-size:12.5px; padding:7px 12px; border-radius:3px; text-decoration:none;
+    border:1px solid var(--card-edge); background:rgba(255,255,255,0.6); color:var(--ink);
+    font-family:'Inter',sans-serif; cursor:pointer; font-weight:500;
+  }
+  .act-actions .primary{background:var(--accent); color:#fdf6e6; border-color:var(--accent);}
+  .act-schedule-row{display:flex; gap:8px; margin-top:8px; flex-wrap:wrap; align-items:center;}
+  .act-schedule-row input[type=date]{
+    flex:0 0 140px; padding:7px 8px; font-size:12.5px; border:1px solid var(--card-edge);
+    border-radius:3px; background:#fffdf8; color:var(--ink); font-family:'Inter',sans-serif;
+  }
+  .act-schedule-row .act-add{
+    font-size:12.5px; padding:7px 12px; border-radius:3px; border:1px solid var(--card-edge);
+    background:rgba(255,255,255,0.6); color:var(--ink); font-weight:500; cursor:pointer; font-family:'Inter',sans-serif;
+  }
+  .act-schedule-row .act-add.added{background:var(--accent); color:#fdf6e6; border-color:var(--accent);}
+
+  .sr-only{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap;}
+
+  .tab-nav{
+    display:flex; flex-wrap:wrap; justify-content:center; gap:4px; margin:0 0 28px;
+    background:rgba(0,0,0,0.05); border:1px solid var(--card-edge); border-radius:10px; padding:5px; max-width:100%;
+  }
+  .tab-btn{
+    padding:8px 16px; border-radius:7px; border:none;
+    background:transparent; color:var(--ink-soft); font-size:13.5px; font-weight:500; cursor:pointer;
+    font-family:'Inter',sans-serif; transition:background 0.15s ease, color 0.15s ease;
+  }
+  .tab-btn:hover{background:rgba(0,0,0,0.05);}
+  .tab-btn.active{background:var(--card); color:var(--ink); box-shadow:0 1px 4px rgba(0,0,0,0.2);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+  .single-wrap{max-width:480px; margin:0 auto;}
+  .wheel-wrap{position:relative; width:240px; margin:0 auto;}
+  .wheel-pointer{position:absolute; top:-8px; left:50%; transform:translateX(-50%); font-size:24px; color:var(--pin-dark); z-index:2; text-shadow:0 1px 2px rgba(0,0,0,0.3);}
+  #wheel-svg{display:block; transform:rotate(0deg); filter:drop-shadow(0 4px 10px rgba(0,0,0,0.25));}
+  .wheel-spin-btn{
+    margin-top:20px; padding:12px 26px; border:none; border-radius:24px; background:var(--accent);
+    color:#fdf6e6; font-weight:600; font-size:15px; cursor:pointer; font-family:'Inter',sans-serif;
+    box-shadow:0 3px 8px rgba(0,0,0,0.25);
+  }
+  .wheel-spin-btn:disabled{opacity:0.6; cursor:default;}
+  .wheel-spin-btn:active:not(:disabled){transform:scale(0.97);}
+  #wheel-result{margin-top:20px; text-align:left;}
+  #wheel-result .act-card{transform:none;}
+  .dish-grid{display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-bottom:18px;}
+  .dish-chip{
+    padding:10px 16px; border-radius:10px; border:1px solid var(--card-edge);
+    background:var(--card); color:var(--ink); font-weight:600; font-size:14px;
+    transition:background 0.08s ease, color 0.08s ease, transform 0.08s ease;
+  }
+  .dish-chip.active{background:var(--accent); color:#fdf6e6; transform:scale(1.08); border-color:var(--accent);}
+  #dish-result{margin-top:16px; font-size:18px; color:var(--ink); font-family:'Kalam',cursive; min-height:26px; display:flex; flex-direction:column; align-items:center; gap:6px;}
+  .dish-suspense{font-size:16px; color:var(--ink-soft); animation:dishBlink 0.9s ease-in-out infinite;}
+  @keyframes dishBlink{0%,100%{opacity:0.5;} 50%{opacity:1;}}
+  .dish-suspense-final{font-size:13px; color:var(--ink-soft); font-family:'Inter',sans-serif; font-weight:500;}
+  @keyframes dishPop{0%{transform:scale(0.7); opacity:0;} 100%{transform:scale(1); opacity:1;}}
+  .dish-face{animation:dishPop 0.25s ease-out;}
+  .dish-head-wobble{
+    transform-box:fill-box; transform-origin:50% 50%;
+    animation:dishWobble 1.1s ease-out 0.85s both;
+  }
+  @keyframes dishWobble{
+    0%{transform:rotate(0);}
+    15%{transform:rotate(-7deg);}
+    35%{transform:rotate(6deg);}
+    55%{transform:rotate(-4deg);}
+    75%{transform:rotate(2deg);}
+    100%{transform:rotate(0);}
+  }
+  .dish-eyes-normal{animation:dishFadeOut 0.2s ease-in 0.75s both;}
+  .dish-eyes-shock{opacity:0; animation:dishFadeIn 0.2s ease-out 0.8s both;}
+  .dish-mouth-normal{animation:dishFadeOut 0.2s ease-in 0.75s both;}
+  .dish-mouth-shock{opacity:0; animation:dishFadeIn 0.2s ease-out 0.8s both;}
+  @keyframes dishFadeOut{to{opacity:0;}}
+  @keyframes dishFadeIn{to{opacity:1;}}
+  .dish-hand-group{
+    transform-box:fill-box; transform-origin:50% 50%;
+    animation:dishSlap 1.6s cubic-bezier(0.36,0.07,0.19,0.97) both;
+  }
+  @keyframes dishSlap{
+    0%{transform:translate(34px,-40px) rotate(-85deg); opacity:0;}
+    8%{opacity:1;}
+    50%{transform:translate(0,0) rotate(-16deg);}
+    60%{transform:translate(-4px,3px) rotate(-24deg);}
+    70%{transform:translate(2px,-2px) rotate(-10deg);}
+    80%{transform:translate(-1px,1px) rotate(-19deg);}
+    100%{transform:translate(0,0) rotate(-16deg);}
+  }
+  .dish-impact{opacity:0; animation:dishImpact 0.5s ease-out 0.8s both;}
+  @keyframes dishImpact{
+    0%{opacity:0; transform:scale(0.5);}
+    30%{opacity:1; transform:scale(1.3);}
+    100%{opacity:0; transform:scale(1.8);}
+  }
+  .dish-sweat{opacity:0; animation:dishSweat 0.9s ease-out 0.85s both;}
+  @keyframes dishSweat{
+    0%{opacity:0; transform:translate(0,0) scale(0.6);}
+    20%{opacity:1;}
+    100%{opacity:0; transform:translate(10px,-16px) scale(0.3);}
+  }
+  .home-tooltip.leaflet-tooltip{
+    background:var(--card); border:1px solid var(--pin); color:var(--ink); font-weight:600;
+    font-size:12px; padding:3px 10px; box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  }
+  .home-tooltip.leaflet-tooltip{
+    background:var(--card); border:1px solid var(--pin); color:var(--ink); font-weight:600;
+    font-size:12px; padding:3px 10px; box-shadow:0 2px 6px rgba(0,0,0,0.3);
+  }
+  #install-link{cursor:pointer; font-family:'Inter',sans-serif;}
+  #install-hint{
+    max-width:320px; margin:10px auto 0; background:var(--card); border:1px solid var(--card-edge);
+    border-radius:8px; padding:10px 14px; font-size:12.5px; color:var(--ink-soft); text-align:center;
+    box-shadow:0 3px 10px rgba(0,0,0,0.12);
+  }
+  .svg-map-wrap{position:relative; background:var(--card); border-radius:10px; border:1px solid var(--card-edge); overflow:hidden;}
+  .svg-map-wrap svg{display:block; width:100%; height:auto;}
+  .map-pin{cursor:pointer;}
+  .map-pin:hover circle{stroke-width:2.5;}
+  .map-caption{
+    background:rgba(255,255,255,0.55); border-top:1px solid var(--card-edge);
+    padding:8px 12px; font-size:12.5px; color:var(--ink); min-height:34px; text-align:center;
+  }
+  .map-caption b{color:var(--accent);}
+  .map-note{font-size:11px; color:var(--ink-soft); text-align:center; margin:6px 0 0;}
+  .route-map-wrap{background:var(--card); border-radius:10px; border:1px solid var(--card-edge); overflow:hidden; margin-bottom:10px;}
+  .route-map-wrap svg{display:block; width:100%; height:auto;}
+  .map-open-cta{
+    height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:10px; padding:20px; text-align:center;
+  }
+  .map-open-cta p{font-size:13px; color:var(--ink-soft); margin:0; max-width:320px;}
+  .map-open-cta.small p{font-size:12px;}
+  .map-open-btn{
+    display:inline-block; padding:10px 20px; border-radius:8px; background:var(--accent);
+    color:#fdf6e6; font-weight:600; font-size:13.5px; text-decoration:none;
+  }
+  .map-open-btn:hover{background:#264f42;}
+  @media(max-width:700px){
+    .tab-nav{
+      flex-wrap:nowrap; justify-content:flex-start; overflow-x:auto; -webkit-overflow-scrolling:touch;
+      position:sticky; top:0; z-index:40; margin:0 -20px 20px; border-radius:0;
+      background:rgba(238,231,219,0.97); backdrop-filter:blur(6px); box-shadow:0 4px 10px rgba(0,0,0,0.12);
+      padding:8px 12px; scrollbar-width:none;
+      -webkit-mask-image:linear-gradient(to right, black calc(100% - 30px), transparent 100%);
+      mask-image:linear-gradient(to right, black calc(100% - 30px), transparent 100%);
+    }
+    .tab-nav::-webkit-scrollbar{display:none;}
+    .tab-btn{flex:0 0 auto; white-space:nowrap;}
+    .filters, .kids-filters{
+      flex-wrap:nowrap; justify-content:flex-start; overflow-x:auto; -webkit-overflow-scrolling:touch;
+      padding-bottom:4px; scrollbar-width:none;
+      -webkit-mask-image:linear-gradient(to right, black calc(100% - 24px), transparent 100%);
+      mask-image:linear-gradient(to right, black calc(100% - 24px), transparent 100%);
+    }
+    .filters::-webkit-scrollbar, .kids-filters::-webkit-scrollbar{display:none;}
+    .filter-chip, .kids-chip{flex:0 0 auto; white-space:nowrap;}
+    .legend{gap:6px 10px; font-size:11px; margin-bottom:20px;}
+  }
+  @media(max-width:520px){
+    #board{padding:20px 14px 40px;}
+    .tab-nav{margin-left:-14px; margin-right:-14px;}
+    .header-icon{width:32px; height:16px; margin-bottom:2px;}
+    header.board-head{margin-bottom:20px;}
+    header.board-head h1{font-size:26px;}
+    header.board-head p{font-size:12.5px;}
+    .header-pills{margin-top:10px; gap:6px;}
+    .trip-dates, .weather-link{padding:6px 12px; font-size:12px;}
+  }
+</style>
+</head>
+<body>
+
+<div id="lock-screen">
+  <div class="lock-card">
+    <div class="lock-icon">
+      <svg viewBox="0 0 24 24" width="26" height="26"><path d="M12 2C8.7 2 6 4.7 6 8v3H5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-9a1 1 0 0 0-1-1h-1V8c0-3.3-2.7-6-6-6zm0 2c2.2 0 4 1.8 4 4v3H8V8c0-2.2 1.8-4 4-4zm0 10a2 2 0 0 1 1 3.73V19a1 1 0 1 1-2 0v-1.27A2 2 0 0 1 12 14z" fill="#fdf6e6"/></svg>
+    </div>
+    <h1>En vecka i Österlen</h1>
+    <p>Ange lösenord för att komma in</p>
+    <input type="password" id="password" placeholder="Lösenord" autocomplete="off">
+    <button id="unlock-btn">Lås upp</button>
+    <div id="lock-error"></div>
+  </div>
+</div>
+
+<div id="board">
+  <h2 class="sr-only">Delad planeringssida för gruppen med aktivitetsförslag, karta, väderprognos, checklista, schema och medlemslista</h2>
+  <header class="board-head">
+    <svg class="header-icon" viewBox="0 0 48 24" width="48" height="24"><path d="M0 16c4 0 4-6 8-6s4 6 8 6 4-6 8-6 4 6 8 6 4-6 8-6 4 6 8 6" fill="none" stroke="var(--accent)" stroke-width="2.2" stroke-linecap="round" opacity="0.85"/></svg>
+    <h1>En vecka i Österlen</h1>
+    <p>Allt ni lägger till syns för hela gruppen som delar den här länken</p>
+    <div class="header-pills">
+      <div class="trip-dates">26 juli – 1 augusti 2026 · Skillinge</div>
+      <a href="https://www.yr.no/en/search?q=Skillinge" target="_blank" rel="noopener" class="weather-link">Väderprognos för Skillinge ↗</a>
+      <button id="install-link" type="button" class="weather-link">📲 Installera app</button>
+    </div>
+    <div id="install-hint" style="display:none;"></div>
+  </header>
+
+  <nav class="tab-nav" id="tab-nav">
+    <button class="tab-btn active" data-tab="overview">Översikt</button>
+    <button class="tab-btn" data-tab="schedule">Schema</button>
+    <button class="tab-btn" data-tab="random">Slumpa</button>
+    <button class="tab-btn" data-tab="bikes">Cykelturer</button>
+    <button class="tab-btn" data-tab="bornholm">Bornholm</button>
+    <button class="tab-btn" data-tab="shopping">Inköpslista</button>
+    <button class="tab-btn" data-tab="toplist">Topplista</button>
+    <button class="tab-btn" data-tab="whereis">Var är alla?</button>
+    <button class="tab-btn" data-tab="journey">Resan dit</button>
+  </nav>
+
+  <div class="tab-panel active" data-panel="overview">
+    <div class="svg-map-wrap">
+      <div id="trip-map"></div>
+      <div class="map-caption" id="trip-map-caption">Klicka på en markering för att se namnet</div>
+    </div>
+    <p class="map-note">Förenklad, egenritad karta (inte skalenlig) – klicka på "Vägbeskrivning" i ett kort för exakt vägbeskrivning i Google Maps.</p>
+    <div class="legend">
+      <span><i style="background:#2f6f9e"></i>Bad</span>
+      <span><i style="background:#3b7a3f"></i>Natur</span>
+      <span><i style="background:#b5762a"></i>Restaurang/fik</span>
+      <span><i style="background:#5c7a3f"></i>Mataffär</span>
+      <span><i style="background:#6b4f9e"></i>Historia</span>
+      <span><i style="background:#c1447a"></i>Lekplats/gård</span>
+      <span><i style="background:#6b6357"></i>Regnig dag</span>
+      <span><i style="background:#8f2e26"></i>Aktivt</span>
+      <span><i style="background:#7f4ab7"></i>Person incheckad</span>
+    </div>
+
+    <div class="layout">
+      <section class="activities">
+        <h2>Aktivitetsförslag</h2>
+        <div class="filters" id="filters"></div>
+        <div class="filters kids-filters" id="kids-filters"></div>
+        <div class="activity-grid" id="activity-grid"></div>
+      </section>
+
+      <aside class="weather-sidebar">
+        <h2>Väder, Skillinge</h2>
+        <div class="weather-row" id="weather-row">
+          <p class="weather-fallback">Hämtar prognos...</p>
+        </div>
+        <p class="weather-note">Blir säkrare närmare resan. Fullständig prognos på <a href="https://www.yr.no/en/forecast/daily-table/5-262500/Sweden/Skillinge" target="_blank" rel="noopener">yr.no ↗</a></p>
+      </aside>
+    </div>
+  </div>
+
+  <div class="tab-panel" data-panel="schedule">
+    <section class="note single-wrap">
+      <h2><i>&#9635;</i>Schema</h2>
+      <ul class="list" id="schedule-list"></ul>
+      <div class="add-row">
+        <input type="date" id="sched-date">
+        <input type="text" id="sched-input" placeholder="Vad händer?">
+        <button id="sched-add">Lägg till</button>
+      </div>
+    </section>
+  </div>
+
+  <div class="tab-panel" data-panel="shopping">
+    <section class="note shopping-note single-wrap">
+      <h2><i>&#9635;</i>Inköpslista</h2>
+      <p style="font-size:12.5px; color:var(--ink-soft); margin:0 0 12px;">Lägg till varor här – de syns automatiskt för alla andra som har den delade länken (kan ta någon sekund). "Dela lista" finns kvar som extra backup om ni vill skicka en textlista i SMS/WhatsApp också.</p>
+      <div id="shopping-groups"></div>
+      <div class="add-row">
+        <input type="text" id="shopping-input" placeholder="T.ex. mjölk, äpplen, blöjor (separera med komma)">
+        <button id="shopping-add">Lägg till</button>
+      </div>
+      <p class="shopping-hint">Sorteras automatiskt efter typ av vara. Skriv gärna flera saker på en gång, separerade med komma.</p>
+
+      <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--card-edge);">
+        <button id="shopping-share" type="button">Dela lista (skapa text att skicka)</button>
+        <textarea id="shopping-share-text" readonly rows="4" style="display:none; width:100%; margin-top:8px; padding:8px; font-size:12.5px; font-family:'Inter',sans-serif; border:1px solid var(--card-edge); border-radius:6px; background:#fffdf8; color:var(--ink);"></textarea>
+        <p id="shopping-share-msg" style="font-size:11.5px; color:var(--ink-soft); margin-top:6px; min-height:14px;"></p>
+      </div>
+
+      <div style="margin-top:14px; padding-top:16px; border-top:1px solid var(--card-edge);">
+        <textarea id="shopping-import-text" placeholder="Klistra in en lista som någon skickat dig här..." rows="4" style="width:100%; padding:8px; font-size:12.5px; font-family:'Inter',sans-serif; border:1px solid var(--card-edge); border-radius:6px; background:#fffdf8; color:var(--ink);"></textarea>
+        <button id="shopping-import-btn" type="button" style="margin-top:8px;">Uppdatera från inklistrad text</button>
+        <p id="shopping-import-msg" style="font-size:11.5px; color:var(--ink-soft); margin-top:6px; min-height:14px;"></p>
+      </div>
+    </section>
+  </div>
+
+  <div class="tab-panel" data-panel="bikes">
+    <section class="bike-section">
+      <h2>Enkla rundor</h2>
+      <div class="bike-grid">
+        <div class="bike-card">
+          <h3>Skillinge runt</h3>
+          <div class="bike-meta"><span id="rt-a-dist">~3–4 km</span><span>I byn</span><span>Helt platt</span></div>
+          <p>En kort snurr runt hamnen och byn, förbi Kapellgårdens café. Bra för en första cykeltur eller om ni bara vill ut en kort stund utan att behöva ut på större väg.</p>
+          <div class="bike-map" id="bike-map-a"></div>
+          <div class="bike-actions">
+            <a class="primary" href="https://www.google.com/maps/dir/?api=1&origin=Skillinge,+Sweden&destination=Skillinge,+Sweden&waypoints=Kapellstr%C3%A4ddet,+Skillinge&travelmode=bicycling" target="_blank" rel="noopener">Öppna i Google Maps</a>
+            <button class="gpx-dl" id="gpx-a" type="button" style="display:none;">Ladda ner GPX (Strava m.fl.)</button>
+          </div>
+        </div>
+        <div class="bike-card">
+          <h3>Skillinge – Brantevik – Simrishamn – runda</h3>
+          <div class="bike-meta"><span id="rt-b-dist">beräknas...</span><span>Cykelväg + kustväg</span><span>Platt</span></div>
+          <p>Ut till Brantevik längs den separata cykelvägen vid kusten, vidare till Simrishamn och tillbaka, så det blir en riktig runda istället för samma väg fram och tillbaka. Stanna gärna till i Brantevik för fika eller fiskrätter.</p>
+          <div class="bike-map" id="bike-map-b"></div>
+          <div class="bike-actions">
+            <a class="primary" href="https://www.google.com/maps/dir/?api=1&origin=Skillinge,+Sweden&destination=Skillinge,+Sweden&waypoints=Brantevik,+Sweden|Simrishamn,+Sweden&travelmode=bicycling" target="_blank" rel="noopener">Öppna i Google Maps</a>
+            <button class="gpx-dl" id="gpx-b" type="button" style="display:none;">Ladda ner GPX (Strava m.fl.)</button>
+          </div>
+        </div>
+        <div class="bike-card">
+          <h3>Kivik-rundan (kör dit, cykla runda)</h3>
+          <div class="bike-meta"><span id="rt-e-dist">beräknas...</span><span>Kör till Kivik, cykla lokalt</span><span>Lätt kuperat</span></div>
+          <p>Parkera bilen i Kivik och cykla en runda via hamnen och Kiviksgraven (Kungagraven), tillbaka till Kivik. Kortare och mer varierad än att cykla hela vägen dit från Skillinge, och ett enkelt sätt att byta miljö.</p>
+          <div class="bike-map" id="bike-map-e"></div>
+          <div class="bike-actions">
+            <a class="primary" href="https://www.google.com/maps/dir/?api=1&origin=Kivik,+Sweden&destination=Kivik,+Sweden&waypoints=Kiviks+hamn|Kiviksgraven&travelmode=bicycling" target="_blank" rel="noopener">Öppna i Google Maps</a>
+            <button class="gpx-dl" id="gpx-e" type="button" style="display:none;">Ladda ner GPX (Strava m.fl.)</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bike-section">
+      <h2>Långa rundor (5–10 mil)</h2>
+      <div class="bike-grid">
+        <div class="bike-card">
+          <h3>Österlen-rundan, norr</h3>
+          <div class="bike-meta"><span id="rt-c-dist">beräknas...</span><span>Sydostleden/Österlenleden</span><span>Kuperat mot slutet</span></div>
+          <p>Skillinge – Simrishamn – Kivik – Brösarps backar – tillbaka. Mestadels flackt längs kusten, med några rejäla backar vid Brösarp som bjuder på fin utsikt. Följer till stora delar de skyltade lederna Sydostleden/Österlenleden.</p>
+          <div class="bike-map" id="bike-map-c"></div>
+          <div class="bike-actions">
+            <a class="primary" href="https://www.google.com/maps/dir/?api=1&origin=Skillinge,+Sweden&destination=Skillinge,+Sweden&waypoints=Simrishamn,+Sweden|Kivik,+Sweden|Br%C3%B6sarps+backar&travelmode=bicycling" target="_blank" rel="noopener">Öppna i Google Maps</a>
+            <button class="gpx-dl" id="gpx-c" type="button" style="display:none;">Ladda ner GPX (Strava m.fl.)</button>
+          </div>
+        </div>
+        <div class="bike-card">
+          <h3>Österlen-rundan, söder</h3>
+          <div class="bike-meta"><span id="rt-d-dist">beräknas...</span><span>Kustnära + Ales stenar</span><span>Mestadels platt</span></div>
+          <p>Skillinge – Brantevik – Simrishamn – Glimmingehus – Kåseberga (Ales stenar) – tillbaka till Skillinge. Mer historia och kustutsikt än höjdskillnader, med några fina stopp på vägen.</p>
+          <div class="bike-map" id="bike-map-d"></div>
+          <div class="bike-actions">
+            <a class="primary" href="https://www.google.com/maps/dir/?api=1&origin=Skillinge,+Sweden&destination=Skillinge,+Sweden&waypoints=Brantevik,+Sweden|Simrishamn,+Sweden|Glimmingehus|K%C3%A5seberga,+Sweden&travelmode=bicycling" target="_blank" rel="noopener">Öppna i Google Maps</a>
+            <button class="gpx-dl" id="gpx-d" type="button" style="display:none;">Ladda ner GPX (Strava m.fl.)</button>
+          </div>
+        </div>
+        <div class="bike-card">
+          <h3>Brösarp – Christinehof-rundan (kör dit, cykla runda)</h3>
+          <div class="bike-meta"><span id="rt-f-dist">beräknas...</span><span>Kör till Brösarp, cykla lokalt</span><span>Kuperat</span></div>
+          <p>Parkera vid Brösarps backar och cykla en runda ut till barockslottet Christinehof och tillbaka genom det böljande backlandskapet. Bra om ni vill ha kuperad, naturskön cykling utan att behöva ta er hela vägen dit från Skillinge först.</p>
+          <div class="bike-map" id="bike-map-f"></div>
+          <div class="bike-actions">
+            <a class="primary" href="https://www.google.com/maps/dir/?api=1&origin=Br%C3%B6sarps+backar&destination=Br%C3%B6sarps+backar&waypoints=Christinehof+Slott|Br%C3%B6sarps+station&travelmode=bicycling" target="_blank" rel="noopener">Öppna i Google Maps</a>
+            <button class="gpx-dl" id="gpx-f" type="button" style="display:none;">Ladda ner GPX (Strava m.fl.)</button>
+          </div>
+        </div>
+      </div>
+      <p style="text-align:center; font-size:12px; color:rgba(253,246,230,0.85); margin-top:14px;">Rutterna på kartorna är beräknade av en öppen ruttjänst (OSRM) och följer riktiga vägar, men kontrollera alltid mot Google Maps-länken innan ni ger er av. Klicka "Ladda ner GPX" för att importera en rutt direkt i Strava (Skapa rutt → Importera GPX-fil) eller andra appar som Garmin Connect och Komoot.</p>
+    </section>
+  </div>
+
+  <div class="tab-panel" data-panel="bornholm">
+    <section class="note bornholm-note single-wrap" style="max-width:640px;">
+      <h2><i>&#9635;</i>Bornholm – dagsutflykt?</h2>
+      <p>Färjan Ystad–Rønne (Bornholmslinjen) tar ca 1 tim 20 min. På vardagar går första turen redan 06.30, med upp till 4 avgångar per vardag och ännu fler på helger och i semesterperioder (upp till 8/dag i högsäsong). Barn 0–11 år reser gratis (max 2 per betalande vuxen). Boka biljett i förväg under sommaren – tiderna nedan är exempel, kontrollera alltid aktuell tidtabell innan ni bokar.</p>
+
+      <h3 style="font-family:'Kalam',cursive; font-size:17px; margin:18px 0 8px;">Exempel på dagsschema</h3>
+      <ul class="bh-schedule">
+        <li><b>08.15</b><span>Avresa Skillinge mot Ystads hamn</span></li>
+        <li><b>08.45</b><span>Incheckning i Ystad (30 min innan med bil, 15 min till fots)</span></li>
+        <li><b>09.00</b><span>Exempel: färja Ystad → Rønne avgår</span></li>
+        <li><b>10.20</b><span>Ankomst Rønne</span></li>
+        <li><b>10.30–16.30</b><span>Tid på Bornholm, se förslag nedan</span></li>
+        <li><b>16.45</b><span>Exempel: färja Rønne → Ystad avgår</span></li>
+        <li><b>18.05</b><span>Ankomst Ystad</span></li>
+        <li><b>18.35</b><span>Tillbaka i Skillinge</span></li>
+      </ul>
+      <p style="font-size:12px; font-style:italic;">Faktiska avgångstider varierar per dag och säsong – se och boka på bornholmslinjen.se innan ni bestämmer schemat. Justerat till en tidigare morgon så ni är hemma i Skillinge till kvällsmat, runt kl 19 istället för efter 20. Vill ni hellre sova ut lite mer finns oftast en senare avgång också, men räkna då med hemkomst en bit efter kl 20.</p>
+
+      <p>Med 2 tim 40 min bara på färjan tur och retur, plus bilresan, blir det en lång dag med de minsta i sällskapet. Välj gärna <b>ett</b> mål nära Rønne istället för att hinna med hela ön – klicka på ett kort för mer info, betygsätt era favoriter eller lägg till i schemat:</p>
+      <div class="activity-grid" id="bornholm-activity-grid"></div>
+
+      <h3 style="font-family:'Kalam',cursive; font-size:17px; margin:18px 0 8px;">Så skulle resan kunna se ut</h3>
+      <div class="bike-map" id="bornholm-map" style="height:220px;"></div>
+      <p id="bornholm-map-caption" style="font-size:12px; color:var(--ink-soft);">Beräknas...</p>
+      <p style="font-size:12px; color:var(--ink-soft);">Enkel, egenritad skiss – raka linjer, inte den riktiga vägen/färjeleden. Alla fem förslag ovan är utmarkerade med röda prickar på Bornholm, klicka på en markering för att hoppa till kortet.</p>
+
+      <p style="margin-top:14px;"><a href="https://www.bornholmslinjen.se" target="_blank" rel="noopener">Boka färja på bornholmslinjen.se ↗</a></p>
+    </section>
+  </div>
+
+  <div class="tab-panel" data-panel="toplist">
+    <section class="note single-wrap" style="max-width:560px;">
+      <h2><i>&#9635;</i>Topplista</h2>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 14px;">Alla i gruppen kan klicka in ett eget betyg (1–5) på varje aktivitet. Här sorteras förslagen efter medelbetyget av allas röster. Betygsätt under "Aktivitetsförslag" i Översikt.</p>
+      <div id="toplist-container"></div>
+    </section>
+  </div>
+
+  <div class="tab-panel" data-panel="whereis">
+    <section class="note single-wrap" style="max-width:520px;">
+      <h2><i>&#9635;</i>Var är alla?</h2>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 14px;">Uppdatera var du är eller vad du gör, så ser resten av gruppen det. Bra när ni delar upp er under dagen.</p>
+      <div class="bike-map" id="whereis-map" style="height:240px; margin-bottom:4px;"></div>
+      <p id="whereis-map-caption" class="map-caption" style="border-radius:0 0 10px 10px; margin-bottom:14px;">Klicka på en markering för namn</p>
+      <div id="whereis-list"></div>
+      <div class="add-row" style="margin-top:12px;">
+        <input type="text" id="whereis-name" placeholder="Ditt namn" style="flex:0 0 110px;">
+        <input type="text" id="whereis-status" list="whereis-places" placeholder="Var? T.ex. Tobisviksbadet, hemma, cyklar till Kivik...">
+        <datalist id="whereis-places"></datalist>
+        <input type="time" id="whereis-until" style="flex:0 0 90px;" aria-label="Till klockan (frivilligt)">
+        <button id="whereis-add">Uppdatera</button>
+        <button id="whereis-gps" type="button">Släpp en nål på min plats</button>
+      </div>
+      <p id="whereis-gps-msg" style="font-size:12px; color:var(--ink-soft); margin-top:6px; min-height:14px;"></p>
+      <p style="font-size:11.5px; color:var(--ink-soft); margin-top:6px; font-style:italic;">Fyll gärna i "till kl" om ni vet ungefär hur länge ni är där – annars visas bara när ni senast uppdaterade. Skriver ni ett namn som redan finns i Aktivitetsförslag (t.ex. "Tobisviksbadet") dyker en markering upp på kartan i Översikt också.</p>
+    </section>
+  </div>
+
+  <div class="tab-panel" data-panel="random">
+    <section class="note single-wrap" style="max-width:480px; text-align:center;">
+      <h2><i>&#9635;</i>Slumpa fram en aktivitet</h2>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 16px;">Kan ni inte bestämma er? Snurra hjulet så väljer slumpen åt er. Filtrera gärna först.</p>
+      <div class="filters" id="random-filters" style="margin-bottom:6px;"></div>
+      <div class="filters kids-filters" id="random-kids-filters" style="margin-bottom:18px;"></div>
+      <div class="wheel-wrap">
+        <div class="wheel-pointer">▼</div>
+        <svg id="wheel-svg" viewBox="0 0 200 200" width="240" height="240"></svg>
+      </div>
+      <button id="wheel-spin-btn" type="button" class="wheel-spin-btn">🎡 Snurra!</button>
+      <div id="wheel-result"></div>
+    </section>
+
+    <section class="note single-wrap" style="max-width:480px; text-align:center; margin-top:24px;">
+      <h2><i>&#9635;</i>Vem diskar?</h2>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 16px;">Slumpa fram vem som tar disken idag.</p>
+      <div id="dish-names" class="dish-grid"></div>
+      <button id="dish-spin-btn" type="button" class="wheel-spin-btn">🍽️ Slumpa!</button>
+      <p id="dish-result"></p>
+    </section>
+  </div>
+
+  <div class="tab-panel" data-panel="journey">
+    <section class="note single-wrap" style="max-width:640px;">
+      <h2><i>&#9635;</i>Resan dit, från Linköping</h2>
+      <p style="font-size:13px; color:var(--ink-soft); margin:0 0 14px;">Bilresan tar ca 5 tim 15 min (416 km), men huset går inte att komma in i förrän kl 17. Startar ni kl 9–10 har ni alltså 2–3 timmar över – gott om tid för ett stopp på vägen.</p>
+      <div class="bike-map" id="journey-map" style="height:260px;"></div>
+      <p id="journey-map-caption" style="font-size:12px; color:var(--ink-soft); margin:6px 0 16px;">Beräknas...</p>
+
+      <div class="journey-options" id="journey-options"></div>
+
+      <p style="font-size:11.5px; color:var(--ink-soft); margin-top:14px; font-style:italic;">Körtiderna är beräknade av en öppen ruttjänst (OSRM) och är ungefärliga – kolla alltid mot Google Maps/bilens GPS på resdagen för aktuell trafik.</p>
+    </section>
+  </div>
+
+</div>
+
+<script>
+(function(){
+  var PASSWORD = "1";
+
+  var lockScreen = document.getElementById('lock-screen');
+  var board = document.getElementById('board');
+  var passwordInput = document.getElementById('password');
+  var unlockBtn = document.getElementById('unlock-btn');
+  var lockError = document.getElementById('lock-error');
+  var lockCard = document.querySelector('.lock-card');
+
+  async function pollRemoteState(){
+    if(!BUCKET_ID || BUCKET_ID.indexOf('local-') === 0) return;
+    var text = await remoteGet();
+    if(text){
+      try{
+        var fresh = JSON.parse(text);
+        fresh.schedule = fresh.schedule || [];
+        fresh.votes = fresh.votes || {};
+        fresh.ratings = fresh.ratings || {};
+        fresh.shopping = fresh.shopping || [];
+        fresh.checkins = fresh.checkins || {};
+        state = fresh;
+        render();
+      }catch(e){}
+    }
+  }
+
+  function nudgeTabNav(){
+    var nav = document.getElementById('tab-nav');
+    if(!nav || nav.scrollWidth <= nav.clientWidth + 4) return;
+    var start = nav.scrollLeft;
+    var supportsSmooth = 'scrollBehavior' in document.documentElement.style;
+    nav.scrollTo({ left: 46, behavior: supportsSmooth ? 'smooth' : 'auto' });
+    setTimeout(function(){
+      nav.scrollTo({ left: start, behavior: supportsSmooth ? 'smooth' : 'auto' });
+    }, 480);
+  }
+
+  function tryUnlock(){
+    if(passwordInput.value === PASSWORD){
+      lockScreen.style.display = 'none';
+      board.style.display = 'block';
+      loadState();
+      setTimeout(nudgeTabNav, 900);
+      setInterval(pollRemoteState, 8000);
+      document.addEventListener('visibilitychange', function(){
+        if(document.visibilityState === 'visible') pollRemoteState();
+      });
+      window.addEventListener('focus', pollRemoteState);
+    } else {
+      lockError.textContent = "Fel lösenord, försök igen";
+      lockCard.classList.remove('shake');
+      void lockCard.offsetWidth;
+      lockCard.classList.add('shake');
+      passwordInput.value = "";
+    }
+  }
+  unlockBtn.addEventListener('click', tryUnlock);
+  passwordInput.addEventListener('keydown', function(e){ if(e.key === 'Enter') tryUnlock(); });
+
+  document.querySelectorAll('.tab-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var tab = btn.dataset.tab;
+      document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.toggle('active', b === btn); });
+      document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.toggle('active', p.dataset.panel === tab); });
+      if(tab === 'overview' && tripMap){
+        setTimeout(function(){ tripMap.invalidateSize(); }, 50);
+      }
+      if(tab === 'bikes'){
+        renderBikeRoutes();
+      }
+      if(tab === 'bornholm'){
+        renderBornholmMap();
+      }
+      if(tab === 'whereis' && !whereisMapInited){
+        whereisMapInited = true;
+        setTimeout(initWhereisMap, 50);
+      } else if(tab === 'whereis' && whereisMap){
+        setTimeout(function(){ whereisMap.invalidateSize(); renderWhereisMapPins(); }, 50);
+      }
+      if(tab === 'toplist'){
+        renderToplist();
+      }
+      if(tab === 'random'){
+        renderRandomFilters();
+        renderWheel();
+        renderDishNames();
+      }
+      if(tab === 'journey'){
+        renderJourneyMap();
+        renderJourneyOptions();
+      }
+    });
+  });
+
+  var state = { schedule: [], votes: {}, ratings: {}, shopping: [], checkins: {}, seeded: false };
+
+  function uid(){ return Math.random().toString(36).slice(2,9); }
+
+  function defaultSchedule(){
+    return [
+      {id: uid(), date: "2026-07-26", text: "Ankomst till huset, packa upp och slappa"},
+      {id: uid(), date: "2026-07-27", text: "Tobisviksbadet – strand, bra för de minsta med skor pga grov sand"},
+      {id: uid(), date: "2026-07-28", text: "Autoseum – motormuseum inomhus, bra om det regnar"},
+      {id: uid(), date: "2026-07-29", text: "Kiviks Musteri & Äpplets Hus – gårdsbutik och aktiviteter för barn"},
+      {id: uid(), date: "2026-07-30", text: "Sankt Olofs friluftsbad – varmt bad, skönt för de yngsta"},
+      {id: uid(), date: "2026-07-31", text: "Mandelmanns Trädgårdar – lugn promenad och fika"},
+      {id: uid(), date: "2026-08-01", text: "Hemresa"}
+    ];
+  }
+
+  var HOME = { name: "Byggmästaregatan 3, Skillinge (där vi bor)", lat: 55.4760334, lng: 14.2851374 };
+  var YSTAD_FERRY = { lat: 55.4252209, lng: 13.8339537 };
+  var RONNE = { lat: 55.10167, lng: 14.693186 };
+  var HAMMERSHUS = { lat: 55.2713045, lng: 14.7553955 };
+  var KAPELLGARDEN = { lat: 55.4742823, lng: 14.2815309 };
+  var BRANTEVIK = { lat: 55.5140258, lng: 14.3481432 };
+  var SIMRISHAMN = { lat: 55.5518855, lng: 14.3312669 };
+  var KIVIK = { lat: 55.6726377, lng: 14.2677064 };
+  var BROSARP = { lat: 55.7192084, lng: 14.131028 };
+  var GLIMMINGEHUS = { lat: 55.5009062, lng: 14.2308277 };
+  var ALES_STENAR = { lat: 55.3828668, lng: 14.0540091 };
+  var KIVIK_HAMN = { lat: 55.6873627, lng: 14.227457 };
+  var KIVIKSGRAVEN = { lat: 55.6826048, lng: 14.2339776 };
+  var CHRISTINEHOF = { lat: 55.7179351, lng: 13.960549 };
+  var SKILLINGE_HAMN = { lat: 55.4746952, lng: 14.2853054 };
+  var ANGTAG_STOP = { lat: 55.735099, lng: 14.124859 };
+
+  var BIKE_ROUTES = [
+    { mapId: "bike-map-a", distId: "rt-a-dist", color: "#2f6f5e", name: "Skillinge runt", points: [HOME, SKILLINGE_HAMN, KAPELLGARDEN, HOME] },
+    { mapId: "bike-map-b", distId: "rt-b-dist", color: "#2f6f5e", name: "Skillinge – Brantevik – Simrishamn – runda", points: [HOME, BRANTEVIK, SIMRISHAMN, HOME] },
+    { mapId: "bike-map-e", distId: "rt-e-dist", color: "#2f6f5e", name: "Kivik-rundan", points: [KIVIK, KIVIK_HAMN, KIVIKSGRAVEN, KIVIK] },
+    { mapId: "bike-map-c", distId: "rt-c-dist", color: "#c1443a", name: "Österlen-rundan, norr", points: [HOME, SIMRISHAMN, KIVIK, BROSARP, HOME] },
+    { mapId: "bike-map-d", distId: "rt-d-dist", color: "#c1443a", name: "Österlen-rundan, söder", points: [HOME, BRANTEVIK, SIMRISHAMN, GLIMMINGEHUS, ALES_STENAR, HOME] },
+    { mapId: "bike-map-f", distId: "rt-f-dist", color: "#c1443a", name: "Brösarp – Christinehof-rundan", points: [BROSARP, CHRISTINEHOF, ANGTAG_STOP, BROSARP] }
+  ];
+
+  function coordsToGPX(routeName, latlngs){
+    var trkpts = latlngs.map(function(ll){ return '<trkpt lat="' + ll[0] + '" lon="' + ll[1] + '"></trkpt>'; }).join('');
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<gpx version="1.1" creator="En vecka i Österlen" xmlns="http://www.topografix.com/GPX/1/1">\n' +
+      '<trk><name>' + routeName + '</name><trkseg>' + trkpts + '</trkseg></trk>\n' +
+      '</gpx>';
+  }
+
+  function downloadGPX(filename, content){
+    var blob = new Blob([content], {type: 'application/gpx+xml'});
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function enableGpxButton(route, latlngs){
+    var suffix = route.mapId.replace('bike-map-', '');
+    var btn = document.getElementById('gpx-' + suffix);
+    if(!btn) return;
+    btn.style.display = '';
+    btn.addEventListener('click', function(){
+      downloadGPX(slugify(route.name) + '.gpx', coordsToGPX(route.name, latlngs));
+    });
+  }
+
+  function routeDistanceKm(points){
+    var total = 0;
+    for(var i = 1; i < points.length; i++){
+      total += haversineKm(points[i-1].lat, points[i-1].lng, points[i].lat, points[i].lng);
+    }
+    return Math.round(total * 10) / 10;
+  }
+
+  var bikeMapsInited = false;
+  var bornholmMapInited = false;
+
+  function renderBikeRoutes(){
+    if(bikeMapsInited) return;
+    bikeMapsInited = true;
+    BIKE_ROUTES.forEach(function(route){ loadBikeRoute(route); });
+  }
+
+  async function loadBikeRoute(route){
+    var mapEl = document.getElementById(route.mapId);
+    var distEl = document.getElementById(route.distId);
+    if(!mapEl || !window.L) return;
+    var m = L.map(route.mapId, {scrollWheelZoom:false, zoomControl:false});
+    watchMap(m);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:18, subdomains:'abcd'}).addTo(m);
+    var coordStr = route.points.map(function(p){ return p.lng + ',' + p.lat; }).join(';');
+    try{
+      var url = 'https://router.project-osrm.org/route/v1/cycling/' + coordStr + '?overview=full&geometries=geojson';
+      var res = await fetch(url);
+      if(!res.ok) throw new Error('OSRM-fel');
+      var data = await res.json();
+      if(!data.routes || !data.routes[0]) throw new Error('Ingen rutt hittades');
+      var geo = data.routes[0].geometry.coordinates;
+      var latlngs = geo.map(function(c){ return [c[1], c[0]]; });
+      var line = L.polyline(latlngs, {color: route.color, weight: 4, opacity: 0.9}).addTo(m);
+      m.fitBounds(line.getBounds(), {padding:[16,16]});
+      route.points.forEach(function(p, idx){
+        var isEnds = (idx === 0 || idx === route.points.length - 1);
+        L.circleMarker([p.lat, p.lng], {radius: isEnds ? 6 : 5, color:'#fdf6e6', weight:2, fillColor: route.color, fillOpacity:1}).addTo(m);
+      });
+      var km = Math.round(data.routes[0].distance / 100) / 10;
+      var mins = Math.round(data.routes[0].duration / 60);
+      var h = Math.floor(mins / 60), mm = mins % 60;
+      var timeStr = h > 0 ? (h + ' tim ' + mm + ' min') : (mm + ' min');
+      if(distEl) distEl.textContent = km + ' km, ca ' + timeStr;
+      setTimeout(function(){ m.invalidateSize(); }, 100);
+      enableGpxButton(route, latlngs);
+    }catch(e){
+      var km2 = routeDistanceKm(route.points);
+      if(distEl) distEl.textContent = '~' + km2 + ' km fågelvägen (kunde inte beräkna cykelväg just nu)';
+      route.points.forEach(function(p, idx){
+        var isEnds = (idx === 0 || idx === route.points.length - 1);
+        L.circleMarker([p.lat, p.lng], {radius: isEnds ? 6 : 5, color:'#fdf6e6', weight:2, fillColor: route.color, fillOpacity:1}).addTo(m);
+      });
+      var bounds = route.points.map(function(p){ return [p.lat, p.lng]; });
+      m.fitBounds(bounds, {padding:[20,20]});
+      setTimeout(function(){ m.invalidateSize(); }, 100);
+    }
+  }
+
+  function renderBornholmMap(){
+    if(bornholmMapInited) return;
+    bornholmMapInited = true;
+    var mapEl = document.getElementById('bornholm-map');
+    if(!mapEl || !window.L) return;
+    var m = L.map('bornholm-map', {scrollWheelZoom:false}).setView([55.6, 14.9], 8);
+    watchMap(m);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:18, subdomains:'abcd'}).addTo(m);
+    var allBounds = [];
+    function markPoint(p, label, color, slug){
+      var popupHtml = '<b>' + label + '</b>' + (slug ? '<br><a href="#act-card-' + slug + '" onclick="window.openActivityCard(\'' + slug + '\'); return false;">Visa i listan</a>' : '');
+      L.circleMarker([p.lat, p.lng], {radius:6, color:'#fdf6e6', weight:2, fillColor:color, fillOpacity:1}).addTo(m).bindPopup(popupHtml);
+      allBounds.push([p.lat, p.lng]);
+    }
+    async function drawDriving(a, b, color){
+      try{
+        var coordStr = a.lng + ',' + a.lat + ';' + b.lng + ',' + b.lat;
+        var res = await fetch('https://router.project-osrm.org/route/v1/driving/' + coordStr + '?overview=full&geometries=geojson');
+        var data = await res.json();
+        var geo = data.routes[0].geometry.coordinates;
+        var latlngs = geo.map(function(c){ return [c[1], c[0]]; });
+        L.polyline(latlngs, {color: color, weight: 4, opacity: 0.9}).addTo(m);
+        latlngs.forEach(function(ll){ allBounds.push(ll); });
+      }catch(e){
+        L.polyline([[a.lat,a.lng],[b.lat,b.lng]], {color: color, weight: 3, dashArray:'4,6', opacity:0.7}).addTo(m);
+      }
+    }
+    (async function(){
+      markPoint(HOME, 'Skillinge (start)', '#2f6f5e');
+      markPoint(YSTAD_FERRY, 'Ystads hamn', '#2f6f5e');
+      BORNHOLM_ACTIVITIES.forEach(function(a){
+        markPoint(a, a.name, '#c1443a', slugify(a.name));
+      });
+      await drawDriving(HOME, YSTAD_FERRY, '#2f6f5e');
+      L.polyline([[YSTAD_FERRY.lat, YSTAD_FERRY.lng],[RONNE.lat, RONNE.lng]], {color:'#2f6f9e', weight:3, dashArray:'3,9', opacity:0.85}).addTo(m).bindPopup('Färja Ystad – Rønne, ca 1 tim 20 min');
+      if(allBounds.length){ m.fitBounds(allBounds, {padding:[20,20]}); }
+      setTimeout(function(){ m.invalidateSize(); }, 100);
+    })();
+    var capEl = document.getElementById('bornholm-map-caption');
+    if(capEl){
+      var toFerry = Math.round(haversineKm(HOME.lat, HOME.lng, YSTAD_FERRY.lat, YSTAD_FERRY.lng) * 10) / 10;
+      var crossing = Math.round(haversineKm(YSTAD_FERRY.lat, YSTAD_FERRY.lng, RONNE.lat, RONNE.lng) * 10) / 10;
+      capEl.innerHTML = 'Skillinge → Ystads hamn: ~' + toFerry + ' km. Färjan över havet till Rønne: ~' + crossing + ' km fågelvägen (tar ca 1 tim 20 min).';
+    }
+  }
+
+  var LINKOPING = { lat: 58.4108, lng: 15.6214, name: "Linköping" };
+  var JOURNEY_STOPS = [
+    {
+      key: "naturum", name: "Naturum Vattenriket", lat: 56.0294, lng: 14.1567,
+      desc: "Naturcenter i Kristianstad, praktiskt taget på vägen (bara ~9 extra km totalt). Gratis inträde, öppet alla dagar 10–17. Barnhörna med pyssel, och en spång genom vass och videsnår ut till friluftsmuseet Årummet – bra blandning av utomhus och inne, och gratis.",
+      website: "https://vattenriket.kristianstad.se/naturum/"
+    },
+    {
+      key: "ahus", name: "Åhus", lat: 55.937039, lng: 14.319992,
+      desc: "Mysig småstad nära Kristianstad med en av Skånes populäraste stränder (Täppet) och den klassiska glassbåten. Bra om ni vill bada och sträcka på benen sista biten innan Skillinge.",
+      website: "https://www.kristianstad.se/upplevaochgora/badfriluftslivochmotion/badplatser/ahusbryggan.6294.html"
+    },
+    {
+      key: "kivik", name: "Kivik", lat: 55.6726377, lng: 14.2677064,
+      desc: "Ligger praktiskt taget rakt på vägen ner till Skillinge (bara ett par minuters omväg totalt) – hit hade ni ändå åkt för Kiviks Musteri. Sista biten från Kivik till Skillinge tar bara ca 35 minuter. Obs: 26 juli är sista dagen på Kiviks Marknad (Sveriges största, ~150 000 besökare), så räkna med kö och fullt om ni stannar just då – annars ett perfekt, nästan omvägsfritt stopp.",
+      website: "https://www.kiviksmusteri.se/"
+    }
+  ];
+  var journeyMapInited = false;
+  var journeyOptionsInited = false;
+
+  function renderJourneyMap(){
+    if(journeyMapInited) return;
+    journeyMapInited = true;
+    var mapEl = document.getElementById('journey-map');
+    if(!mapEl || !window.L) return;
+    var m = L.map('journey-map', {scrollWheelZoom:false}).setView([57.2, 14.9], 6);
+    watchMap(m);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:18, subdomains:'abcd'}).addTo(m);
+    var allBounds = [];
+    function markPoint(p, label, color){
+      L.circleMarker([p.lat, p.lng], {radius:7, color:'#fdf6e6', weight:2, fillColor:color, fillOpacity:1}).addTo(m).bindPopup('<b>' + label + '</b>');
+      allBounds.push([p.lat, p.lng]);
+    }
+    async function drawDriving(a, b, color){
+      try{
+        var coordStr = a.lng + ',' + a.lat + ';' + b.lng + ',' + b.lat;
+        var res = await fetch('https://router.project-osrm.org/route/v1/driving/' + coordStr + '?overview=full&geometries=geojson');
+        var data = await res.json();
+        var geo = data.routes[0].geometry.coordinates;
+        var latlngs = geo.map(function(c){ return [c[1], c[0]]; });
+        L.polyline(latlngs, {color: color, weight: 4, opacity: 0.85}).addTo(m);
+        latlngs.forEach(function(ll){ allBounds.push(ll); });
+      }catch(e){
+        L.polyline([[a.lat,a.lng],[b.lat,b.lng]], {color: color, weight: 3, dashArray:'4,6', opacity:0.7}).addTo(m);
+      }
+    }
+    (async function(){
+      markPoint(LINKOPING, 'Linköping (start)', '#2f6f5e');
+      JOURNEY_STOPS.forEach(function(s){ markPoint(s, s.name, '#c1443a'); });
+      markPoint(HOME, 'Skillinge (mål)', '#2f6f5e');
+      await drawDriving(LINKOPING, HOME, '#8f6039');
+      if(allBounds.length){ m.fitBounds(allBounds, {padding:[24,24]}); }
+      setTimeout(function(){ m.invalidateSize(); }, 150);
+    })();
+    var capEl = document.getElementById('journey-map-caption');
+    if(capEl) capEl.textContent = 'Linjen visar huvudvägen Linköping–Skillinge. Röda markeringar är de två stoppförslagen nedan, gröna är start och mål.';
+  }
+
+  async function computeLeg(a, b){
+    try{
+      var coordStr = a.lng + ',' + a.lat + ';' + b.lng + ',' + b.lat;
+      var res = await fetch('https://router.project-osrm.org/route/v1/driving/' + coordStr + '?overview=false');
+      if(!res.ok) throw new Error('OSRM-fel');
+      var data = await res.json();
+      var route = data.routes[0];
+      return { km: Math.round(route.distance / 100) / 10, mins: Math.round(route.duration / 60) };
+    }catch(e){
+      var km = Math.round(haversineKm(a.lat, a.lng, b.lat, b.lng) * 1.2 * 10) / 10;
+      return { km: km, mins: Math.round(km / 80 * 60) };
+    }
+  }
+
+  function formatMins(mins){
+    var h = Math.floor(mins / 60), m = mins % 60;
+    return h > 0 ? (h + ' tim ' + (m > 0 ? m + ' min' : '')) : (m + ' min');
+  }
+  function formatClock(minutesFromMidnight){
+    var h = Math.floor(minutesFromMidnight / 60) % 24, m = Math.round(minutesFromMidnight % 60);
+    return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m;
+  }
+
+  async function renderJourneyOptions(){
+    if(journeyOptionsInited) return;
+    journeyOptionsInited = true;
+    var el = document.getElementById('journey-options');
+    if(!el) return;
+    el.innerHTML = '<p style="text-align:center; color:var(--ink-soft); font-size:13px;">Beräknar körtider...</p>';
+
+    var DEPART = 9 * 60 + 30;
+    var direct = await computeLeg(LINKOPING, HOME);
+    var legs = {};
+    for(var i = 0; i < JOURNEY_STOPS.length; i++){
+      var s = JOURNEY_STOPS[i];
+      legs[s.key] = {
+        toStop: await computeLeg(LINKOPING, s),
+        fromStop: await computeLeg(s, HOME)
+      };
+    }
+
+    var html = '<div class="bike-card">' +
+      '<h3>Direkt, inga stopp</h3>' +
+      '<div class="bike-meta"><span>' + direct.km + ' km</span><span>ca ' + formatMins(direct.mins) + '</span></div>' +
+      '<p>Kör rakt igenom. Ni är framme långt innan huset går att komma in i, så räkna med att fylla ett par timmar i Skillinge/Simrishamn innan kl 17 (fika, promenad, handla mat).</p>' +
+      '<ul class="bh-schedule">' +
+        '<li><b>' + formatClock(DEPART) + '</b><span>Avresa Linköping</span></li>' +
+        '<li><b>' + formatClock(DEPART + direct.mins) + '</b><span>Framme i Skillinge</span></li>' +
+      '</ul>' +
+    '</div>';
+
+    JOURNEY_STOPS.forEach(function(s){
+      var leg = legs[s.key];
+      var arriveStop = DEPART + leg.toStop.mins;
+      var stopMins = 90;
+      var departStop = arriveStop + stopMins;
+      var arriveHome = departStop + leg.fromStop.mins;
+      html += '<div class="bike-card">' +
+        '<h3>Stopp vid ' + s.name + '</h3>' +
+        '<div class="bike-meta"><span>' + (Math.round((leg.toStop.km + leg.fromStop.km) * 10) / 10) + ' km totalt</span><span>ca ' + formatMins(leg.toStop.mins + leg.fromStop.mins) + ' körning</span></div>' +
+        '<p>' + s.desc + '</p>' +
+        '<ul class="bh-schedule">' +
+          '<li><b>' + formatClock(DEPART) + '</b><span>Avresa Linköping</span></li>' +
+          '<li><b>' + formatClock(arriveStop) + '</b><span>Framme vid ' + s.name + ' (' + leg.toStop.km + ' km, ' + formatMins(leg.toStop.mins) + ')</span></li>' +
+          '<li><b>~1,5 tim</b><span>Stanna, äta/sträcka på benen</span></li>' +
+          '<li><b>' + formatClock(departStop) + '</b><span>Avresa mot Skillinge</span></li>' +
+          '<li><b>' + formatClock(arriveHome) + '</b><span>Framme i Skillinge (' + leg.fromStop.km + ' km, ' + formatMins(leg.fromStop.mins) + ')</span></li>' +
+        '</ul>' +
+        (s.website ? '<div class="bike-actions"><a class="primary" href="' + s.website + '" target="_blank" rel="noopener">Hemsida ↗</a></div>' : '') +
+      '</div>';
+    });
+
+    el.innerHTML = html;
+  }
+
+  var ACTIVITIES = [
+    {
+      name: "Autoseum", tag: "rain", tagLabel: "Regnig dag", kidsLevel: "great", kidsNote: "Lekhörna med leksaker, bra paus för de yngsta",
+      blurb: "Ett av Sveriges största motormuseum, med hundratals bilar, motorcyklar, leksaker och grammofoner under tak. Har en lekhörna med leksaker där barnen kan ta en paus, och café på plats. Bra alternativ om vädret krånglar.",
+      address: "Fabriksgatan 10, Simrishamn", hours: "Öppet alla dagar 10–17",
+      lat: 55.5490773, lng: 14.3419441, placeId: "ChIJUfra17FEVEYR4hXThfHk8M4", website: "https://autoseum.se/"
+    },
+    {
+      name: "Tobisviksbadet", tag: "water", tagLabel: "Bad", kidsLevel: "great", kidsNote: "Egen barnbassäng, barn under 5 år gratis",
+      blurb: "Nyrenoverat friluftsbad med tre bassänger, varav en särskild barnbassäng. Havsvatten som värms upp, stora gräsytor att ligga på. Prisvärt, barn under 5 år är gratis. Tänk på att komma tidigt en varm dag, det blir fullt.",
+      address: "Tobisvägen 18, Simrishamn", hours: "Öppet dagligen, oftast 11–18/20",
+      lat: 55.5663652, lng: 14.3386635, placeId: "ChIJfSZbPz9FVEYRDPWVHA9qVvE", website: "https://www.simrishamn.se/gata-park-och-natur/park-och-natur/badstrander/tobisvik"
+    },
+    {
+      name: "Kiviks Musteri & Äpplets Hus", tag: "food", tagLabel: "Fika", kidsLevel: "good", kidsNote: "Lugnt att gå runt med vagn, kan bli kö i butiken",
+      blurb: "Musteri mitt bland äppelodlingarna i Kivik. Gårdsbutik med must, cider, sylt och saft, plus café/restaurang. Går bra att strosa runt bland träden med barnvagn. Ofta fullt av folk en solig dag, räkna med kö i butiken.",
+      address: "Karakåsvägen 45, Kivik", hours: "Öppet alla dagar 10–18",
+      lat: 55.6726377, lng: 14.2677064, placeId: "ChIJl8E9dmhqVEYR1h21gGkKiao", website: "https://www.kiviksmusteri.se/"
+    },
+    {
+      name: "Mandelmanns Trädgårdar", tag: "nature", tagLabel: "Lugnt", kidsLevel: "mixed", kidsNote: "Mer en lugn promenad än lek, bokning kan behövas",
+      blurb: "Ekologisk trädgård med egna djur och odlingar, fina sittplatser bland blommor och en damm med karpar. Servering och liten gårdsbutik. Stängt lördag och söndag, och det kan behövas bordsbokning – kolla innan ni åker.",
+      address: "Klappeskogsvägen 6, Simrishamn", hours: "Mån–fre 10–16, stängt helger",
+      lat: 55.6286404, lng: 14.2424353, placeId: "ChIJ846LZQBDVEYRGQKa--sYM9M", website: "https://mandelmann.se/"
+    },
+    {
+      name: "Stenshuvuds nationalpark", tag: "nature", tagLabel: "Vandring", kidsLevel: "great", kidsNote: "Grön led (0,5 km) är tillgänglighetsanpassad, Blå led (1 km) genom orkidéängen ner till havet",
+      blurb: "Kuperad skog, klippstrand med rundade stenar och milsvid utsikt från toppen. Flera slingor i olika längd: Grön led (0,5 km, anpassad för rullstol/barnvagn), Blå led (1 km, den mest populära, ner till havet genom en orkidéäng), Röd led (2 km, klassisk runda upp till toppen genom bokskog) och Lila/Gul led för den som vill gå längre. Naturum vid entrén har utställningar och målarbord som är bra för de yngsta om benen blir trötta. Bra grillplatser om ni tar med matsäck.",
+      address: "Simrishamn N (vid Kivik/Hälleviksstrand)", hours: "Öppet dygnet runt",
+      lat: 55.656184, lng: 14.268711, placeId: "ChIJpXwBYOZBVEYRrgAwnSM1h-c", website: "https://www.sverigesnationalparker.se/park/stenshuvuds-nationalpark/"
+    },
+    {
+      name: "Kiviksgraven (Kungagraven)", tag: "history", tagLabel: "Historia", kidsLevel: "good", kidsNote: "Kort besök, spännande historia för lite äldre barn",
+      blurb: "En bronsåldersgrav med målade hällar, litet museum och en trevlig liten café vid bäcken. Går att se på ungefär 30 minuter, så passar bra att kombinera med annat samma dag. Lagom spännande för lite äldre barn.",
+      address: "Bredarörsvägen 18, Kivik", hours: "Öppet alla dagar 11–17",
+      lat: 55.6826048, lng: 14.2339776, placeId: "ChIJBdCVL2dqVEYRnlmeKQ1RPEM", website: "https://www.bredaror.se/"
+    },
+    {
+      name: "Ystad Arena", tag: "rain", tagLabel: "Regnig dag", kidsLevel: "great", kidsNote: "Vattenrutschkanor och lat flod, mycket omtyckt av barn",
+      blurb: "Modernt badhus med tre bassänger i olika storlekar, lat flod, vattenrutschkanor och bastu. Enligt recensioner mycket uppskattat av barnfamiljer och bra för några timmars aktivitet oavsett väder. Café finns men med begränsat matutbud, ta gärna med egen matsäck.",
+      address: "Fridhemsgatan 27, Ystad", hours: "Varierar per dag, se aktuella tider innan besök",
+      lat: 55.433363, lng: 13.8335922, placeId: "ChIJmSZNnkV9VEYRTJitNPBJ_e4", website: "https://ystad.se/ystadarenabad"
+    },
+    {
+      name: "Ystad Studios Visitor Center", tag: "history", tagLabel: "Museum", kidsLevel: "good", kidsNote: "Barnen får köra bil inomhus, kul även för små",
+      blurb: "Litet museum kopplat till Wallander-inspelningarna, där barnen bland annat får \"köra bil\" inomhus. Enligt recensioner extra kul för barn även utan att känna till Wallander. Beräkna ca en timme för ett fullständigt besök. Stängt söndagar.",
+      address: "Elis Nilssons väg 14, Ystad", hours: "Mån–fre 10–16, lör 11–15, stängt söndagar",
+      lat: 55.433932, lng: 13.84383, placeId: "ChIJQ_WbmU59VEYRjVmk6vW1n_M", website: "https://www.ysvc.se/"
+    },
+    {
+      name: "Ystad Beach", tag: "water", tagLabel: "Bad", kidsLevel: "great", kidsNote: "Lekplats vid stranden enligt recensioner",
+      blurb: "Lång sandstrand nära Ystad centrum, enkelt att ta sig till både till fots och med buss. En lekplats finns vid stranden enligt recensioner, men kolla själva om det finns toaletter/omklädning innan ni åker.",
+      address: "Ystad Beach, Ystad", hours: "Alltid tillgänglig",
+      lat: 55.4249239, lng: 13.8498883, placeId: "ChIJq0S-wKxiVEYRWLi55ud1XG4"
+    },
+    {
+      name: "Gråbrödraklostret", tag: "history", tagLabel: "Historia", kidsLevel: "mixed", kidsNote: "Mest en lugn historisk promenad, bäst för äldre barn",
+      blurb: "Medeltida klosterbyggnad mitt i Ystads gamla stad, med en fin ros- och örtträdgård utomhus och ett litet museum inne. Trevligt inslag i en promenad genom gamla stan. Stängt måndagar.",
+      address: "S:t Petri Kyrkoplan, Ystad", hours: "Tis–fre 10–17, lör–sön 12–16, stängt måndagar",
+      lat: 55.4313302, lng: 13.8198688, placeId: "ChIJ-ezsFF19VEYRPfBcxdJz_Rg", website: "https://ystad.se/uppleva-och-gora/kultur-och-upplevelser/klostret-i-ystad"
+    },
+    {
+      name: "Engelska bryggan", tag: "nature", tagLabel: "Utflykt", kidsLevel: "good", kidsNote: "Lugn kustpromenad, inget särskilt för barn men trevlig",
+      blurb: "Historisk gammal brygganläggning vid havet strax utanför Ystad, med en fin och lugn kustpromenad. Mest folktomt även på sommaren enligt recensioner, gratis parkering finns nära.",
+      address: "Ystad (vid kusten)", hours: "Alltid tillgänglig",
+      lat: 55.4199081, lng: 13.8413887, placeId: "ChIJ7_XqdVV9VEYRefuwY6kQN0M"
+    },
+    {
+      name: "Onslunda discgolf", tag: "active", tagLabel: "Aktivt", kidsLevel: "mixed", kidsNote: "Mest för äldre barn eller vuxna som vill kasta disc",
+      blurb: "Discgolfbana en bit inåt land från Skillinge, med goda recensioner. Bra om någon i sällskapet vill röra på sig lite mer. Ta med egna discar eller hör efter om lån på plats innan ni åker.",
+      address: "Sportvägen 15, Onslunda", hours: "Utomhusbana, tillgänglig dagtid",
+      lat: 55.5954726, lng: 14.0504002, placeId: "ChIJQRJNNQBvVEYRIVhqrp6BVgs", website: "https://udisc.com/courses/onslunda-discgolf-park-c3J6"
+    },
+    {
+      name: "Tobisviks minigolf", tag: "active", tagLabel: "Aktivt", kidsLevel: "great", kidsNote: "Klassisk rolig aktivitet för hela familjen",
+      blurb: "Minigolfbana precis vid Tobisviksbadet, så går utmärkt att kombinera med en stranddag. Varierade och roliga banor enligt recensioner, med kiosk för glass mellan varven.",
+      address: "Tobisvägen, Simrishamn", hours: "Säsongsöppet, samma område som Tobisviksbadet",
+      lat: 55.5670701, lng: 14.33741, placeId: "ChIJMe22MrVFVEYRSQaAnGQF2Pc", website: "https://www.facebook.com/TobisviksMinigolfklubb/"
+    },
+    {
+      name: "Jonebergsparkens lekplats", tag: "play", tagLabel: "Lekplats", kidsLevel: "good", kidsNote: "Enligt recensioner bäst från ca 3 år och uppåt",
+      blurb: "Stor lekpark med klätterställningar, gungor, sandlåda och utegym, samt bänkar med bra överblick för de vuxna. Enligt recensioner passar den bäst för barn från ca 3 år och uppåt, men det finns även enklare lek för de minsta.",
+      address: "Fredsdalsgatan 10, Simrishamn", hours: "Öppet dygnet runt",
+      lat: 55.556446, lng: 14.3369045, placeId: "ChIJ4RK8GFRFVEYRWTs0rIbqWE4"
+    },
+    {
+      name: "Vitemölla Glasskiosk", tag: "food", tagLabel: "Fika", kidsLevel: "great", kidsNote: "Glass och minigolf, en riktig barnklassiker",
+      blurb: "Glasskiosk med minigolf i Vitemölla, ett enkelt och trevligt stopp för glass efter en stranddag. Bra mellanstopp mellan Kivik och Stenshuvud.",
+      address: "Lejegatan 62, Kivik", hours: "Öppet alla dagar 11–17",
+      lat: 55.6965678, lng: 14.2123023, placeId: "ChIJZzrjdPlqVEYRLLRehc3iPo0", website: "https://www.facebook.com/badkiosken/"
+    },
+    {
+      name: "Gunnarshögs Gård", tag: "play", tagLabel: "Gårdsbesök", kidsLevel: "great", kidsNote: "Trampbilar och skattjakt, mycket barnvänligt enligt recensioner",
+      blurb: "Gårdsbutik med rapsolja och annat från gården, och en lekyta utanför med trampbilar/trampetraktorer och en liten skattjakt. Beskrivs som väldigt barnvänligt, med barnredskap i caféet. Bra för de yngsta, och lugnt tempo för mor-/farföräldrar.",
+      address: "Vallbyvägen 90, Hammenhög", hours: "Mån–fre 9–17, helg 9–16",
+      lat: 55.4957872, lng: 14.1830455, placeId: "ChIJ1R_nvZNdVEYR8wsng2yBL1c", website: "https://www.gunnarshog.se/"
+    },
+    {
+      name: "Tosselilla Sommarland", tag: "active", tagLabel: "Nöjespark", kidsLevel: "great", kidsNote: "Byggt för barn, har bassäng även för de allra minsta",
+      blurb: "Äventyrsland med vattenland, karuseller och djur som getter och alpackor. Har även en bassäng för de allra minsta. Ligger drygt 40 minuter bilväg bort, mot Tomelilla, så räkna med en heldagsutflykt. Inträdet är dyrt, särskilt från 3 års ålder.",
+      address: "Svampakorset, Tomelilla", hours: "Öppet alla dagar 10–18",
+      lat: 55.552985, lng: 13.906429, placeId: "ChIJy-GbZgB7VEYRUwce7wWEbGk", website: "https://tosselilla.se/"
+    },
+    {
+      name: "Glimmingehus", tag: "history", tagLabel: "Slott", kidsLevel: "good", kidsNote: "Roligt för barn, men branta trappor kan vara knepiga med små",
+      blurb: "Medeltida borg med temavisningar, hantverk att prova och en digital guide (katten Jönsson) som är gjord för barn. Bra på en molnig dag. Tänk på att det är branta trappor i borgen, så det kan vara jobbigt för mormor/morfar att ta sig runt hela vägen.",
+      address: "Borgvägen 6, Hammenhög", hours: "Öppet alla dagar 10–18",
+      lat: 55.5009062, lng: 14.2308277, placeId: "ChIJEf7h0qxdVEYRCVPufnHLSW8", website: "https://glimmingehus.se/"
+    },
+    {
+      name: "Havängs Dösen", tag: "nature", tagLabel: "Strand & historia", kidsLevel: "great", kidsNote: "Trätrall gör det lätt att ta sig fram med barnvagn",
+      blurb: "En stenåldersgrav på en vacker strand med sanddyner. Spänger av trä gör det lätt att ta sig fram med barnvagn eller rullstol, vilket gör det till ett av de mer tillgängliga alternativen för hela gänget, inklusive mormor och morfar.",
+      address: "Simrishamn N (Haväng)", hours: "Öppet dygnet runt",
+      lat: 55.7261844, lng: 14.1945715, placeId: "ChIJEwt5C6BrVEYRjSlNt0d3_hU", website: "https://www.lansstyrelsen.se/skane/besoksmal/naturreservat/simrishamn/havang-och-vitemolla-strandbackar.html"
+    },
+    {
+      name: "Kivik Art Centre", tag: "nature", tagLabel: "Konst & utsikt", kidsLevel: "mixed", kidsNote: "Blandade recensioner, mest tänkt för äldre barn och vuxna",
+      blurb: "Utomhus konst- och skulpturpark med fin utsikt över kusten. OBS: senaste recensionerna är blandade, flera besökare rapporterar att utställningen varit pausad eller att det funnits mindre att se än väntat. Värt att kolla aktuellt läge innan ni åker en bit dit i onödan.",
+      address: "Svabesholms Kungsgård, Kivik", hours: "Öppet alla dagar ca 10–19",
+      lat: 55.6591648, lng: 14.2342259, placeId: "ChIJ7YSJpXFqVEYRzSU7KB0JWvE", website: "https://www.kivikart.se/"
+    },
+    {
+      name: "Sandhammaren", tag: "water", tagLabel: "Bad", kidsLevel: "great", kidsNote: "Ramp och grunt vatten, mycket bra för de yngsta",
+      blurb: "Vit sandstrand med sanddyner, ofta kallad en av Sveriges finaste. Har en ramp och trädäck ner till stranden, vilket gör den bra för barnvagn, och vattnet är grunt en bra bit ut. Kiosk med glass, snacks och lunch vid parkeringen. Ligger en bit söder om Skillinge.",
+      address: "Sandhammarvägen 27, Löderup", hours: "Stranden alltid tillgänglig, kiosk/servering med säsongsbundna öppettider",
+      lat: 55.3867086, lng: 14.1931728, placeId: "ChIJA7nYVGZfVEYRHOWtH2SYJPQ", website: "https://www.lansstyrelsen.se/skane/besoksmal/naturreservat/ystad/sandhammaren.html"
+    },
+    {
+      name: "Ales stenar", tag: "history", tagLabel: "Historia", kidsLevel: "good", kidsNote: "Trappor från parkeringen, annars fint för lite äldre barn",
+      blurb: "Ett stort stenskepp med 59 resta stenar på en höjd vid havet, ett av Skånes mest kända besöksmål. Vackra promenadstigar runt omkring. Det är trappsteg upp från parkeringen så barnvagn kan vara knepigt hela vägen, men enligt besökare finns det alternativa vägar.",
+      address: "Killevägen 52, Löderup (Kåseberga)", hours: "Öppet dygnet runt",
+      lat: 55.3828668, lng: 14.0540091, placeId: "ChIJQalsE5eKVEYR2_cRlnpYco0", website: "https://www.visitystad.se/kaseberga-alesstenar"
+    },
+    {
+      name: "Brösarps backar", tag: "nature", tagLabel: "Utflykt", kidsLevel: "great", kidsNote: "Öppna backar att springa i, uppskattat av barnfamiljer",
+      blurb: "Kuperat backlandskap med utsikt över landskapet och havet, hästar som betar på höjderna och gott om picknickbord. Det finns en runda på ungefär 5 km som beskrivs som perfekt för familjer med små barn, men även en kortare sväng upp för en av kullarna räcker för fin utsikt.",
+      address: "Brösarp, Tomelilla", hours: "Öppet dygnet runt",
+      lat: 55.7192084, lng: 14.131028, placeId: "ChIJMQiRO9psVEYRCzXTqS415wY", website: "https://www.brosarp.se/att-hitta-pa-i-brosarp/brosarps-backar/"
+    },
+    {
+      name: "Dag Hammarskjölds Backåkra", tag: "history", tagLabel: "Museum", kidsLevel: "mixed", kidsNote: "Stillsamt museum, mer för vuxna än för barn",
+      blurb: "Före detta FN-generalsekreterarens gård, idag ett stillsamt litet museum med fina promenadstigar runt omkring. Mer avslappnat tempo, bra om ni vill ha en lugnare dag för de vuxna medan barnen springer runt utomhus.",
+      address: "Backåkravägen 73, Löderup", hours: "Tis–sön 11–17, stängt måndagar",
+      lat: 55.3884961, lng: 14.1306924, placeId: "ChIJI9FsYfNfVEYRSfm3Gbk5FiM", website: "https://dhbackakra.se/"
+    },
+    {
+      name: "Branteviks hamn", tag: "food", tagLabel: "Hamn & fisk", kidsLevel: "good", kidsNote: "Mysigt men inget särskilt riktat till barn",
+      blurb: "Litet mysigt fiskeläge med hamnkiosk som säljer rökt, grillad och friterad lokal fisk. Fin och avslappnad atmosfär, bra för en enkel promenad och lunch nära Skillinge.",
+      address: "Östersjögatan, Brantevik", hours: "Kioskens öppettider varierar, bäst mitt på dagen",
+      lat: 55.5140258, lng: 14.3481432, placeId: "ChIJadU1OBRbVEYRCqNI6iChrvI", website: "https://www.brantevik.se/"
+    },
+    {
+      name: "Baskemölla badplats", tag: "water", tagLabel: "Bad", kidsLevel: "great", kidsNote: "Skyddad vik med lugnt insteg, bra för de minsta",
+      blurb: "Liten skyddad badvik precis vid den fina byn Baskemölla. Beskrivs som perfekt för hela familjen, med ett lugnt insteg där även de allra minsta kan plaska runt bekvämt. Tänk på att stenarna kan vara hala efter regn.",
+      address: "Tjörnedalavägen 20, Simrishamn", hours: "Alltid tillgänglig",
+      lat: 55.5970289, lng: 14.311976, placeId: "ChIJA74CZEpDVEYR-Wr91ybf97E"
+    },
+    {
+      name: "Knäbäckshusstranden", tag: "water", tagLabel: "Bad", kidsLevel: "mixed", kidsNote: "Trappor ner och begränsad parkering, bäst för äldre barn",
+      blurb: "En av Österlens mest omtalade stränder, lång och otroligt vacker med grönska nära vattnet. Några trappsteg ner till stranden och begränsat med parkering, så åk gärna tidigt en fin dag. Mer av en upplevelse än en snabb barnstrand.",
+      address: "Knäbäckshusstranden, Simrishamn N", hours: "Alltid tillgänglig",
+      lat: 55.642189, lng: 14.2773999, placeId: "ChIJiW_8AYtBVEYR3wzOVjK1TjM"
+    },
+    {
+      name: "Viks havsbad", tag: "water", tagLabel: "Bad", kidsLevel: "mixed", kidsNote: "Blir djupt snabbt, bäst för äldre barn och simkunniga",
+      blurb: "Fin sandstrand som blir djup ganska snabbt, så bäst för lite äldre barn och vuxna simmare snarare än de minsta. Något skyddat läge som gör det varmare en varm dag. Parkering finns vid Prästens badkar en liten bit bort.",
+      address: "Viks fiskeläge, Simrishamn", hours: "Alltid tillgänglig",
+      lat: 55.6092974, lng: 14.2981448, placeId: "ChIJV6ZuIOtDVEYRVmNeheegeyI"
+    },
+    {
+      name: "Prästens badkar", tag: "nature", tagLabel: "Naturbad", kidsLevel: "mixed", kidsNote: "Hala klippor, mer för rörligare barn och vuxna",
+      blurb: "Speciell klippformation vid havet med ett naturligt \"badkar\" i berget. Mest en upplevelse för lite rörligare besökare snarare än en klassisk barnstrand, klipporna kan vara hala. Fint för en promenad och picknick oavsett om man badar eller inte.",
+      address: "Prästens badkar, Simrishamn", hours: "Alltid tillgänglig",
+      lat: 55.6128472, lng: 14.2976359, placeId: "ChIJm-1hvbVDVEYRnhAYC6VmPG4"
+    },
+    {
+      name: "Skillinge Hamnkrog", tag: "food", tagLabel: "Restaurang", kidsLevel: "good", kidsNote: "Restaurang, kolla barnmeny innan ni bokar bord",
+      blurb: "Fiskrestaurang mitt i hamnen i Skillinge, gångavstånd från huset. Fin utsikt över hamnen och klassiska skaldjursrätter, enligt recensioner mycket uppskattad men något dyrare prisklass.",
+      address: "Strandgatan 1, Skillinge", hours: "Öppet alla dagar 12–23",
+      lat: 55.4746952, lng: 14.2853054, placeId: "ChIJJZLa2C1dVEYRg8manoPd7eE", website: "https://skillingehamnkrog.se/"
+    },
+    {
+      name: "Byakrogen Skillinge", tag: "food", tagLabel: "Restaurang", kidsLevel: "good", kidsNote: "Pizza brukar falla väl ut hos barn",
+      blurb: "Pizzeria med vedeldad ugn i Skillinge, gångavstånd från huset. Bra alternativ för en enklare familjemiddag, men räkna med att det kan ta ett tag under högsäsong.",
+      address: "Branteviksvägen 3, Skillinge", hours: "Öppet alla dagar 12.30–20.30",
+      lat: 55.4760422, lng: 14.2864081, placeId: "ChIJdXYgwAJdVEYRD40AP6OUUI8", website: "https://www.facebook.com/infobyakrogenskillinge/"
+    },
+    {
+      name: "Skillinge Teater", tag: "food", tagLabel: "Restaurang", kidsLevel: "good", kidsNote: "Vegetariskt alternativ finns alltid, lugn miljö",
+      blurb: "Mysig restaurang kopplad till en liten teater i Skillinge, meny som byter dagligen och alltid något vegetariskt alternativ. Trevlig och kreativ atmosfär, öppet kvällstid tisdag till söndag.",
+      address: "Möllevångsgatan 9, Skillinge", hours: "Tis–sön 17–21, stängt måndagar",
+      lat: 55.476416, lng: 14.2797618, placeId: "ChIJ7Xu8lQtcVEYRKWB3hvaLzsI", website: "https://www.skillingeteater.se/"
+    },
+    {
+      name: "Tryffelsvinet", tag: "food", tagLabel: "Restaurang", kidsLevel: "mixed", kidsNote: "Mer vuxen restaurangkänsla, kolla barnmeny innan",
+      blurb: "Populär pastarestaurang mitt i Kivik, både inne och ute. Boka gärna bord i förväg under högsäsong för inomhusplats, uteserveringen tar bara drop-in.",
+      address: "Torget, Kivik", hours: "Ons–fre 11.30–21.30/22, lör 12–22, sön 12–21, stängt mån–tis",
+      lat: 55.6852808, lng: 14.225344, placeId: "ChIJAQAAABxqVEYRN3UI6CJO0Cs", website: "https://tryffelsvinetkivik.se/"
+    },
+    {
+      name: "Buhres på Kivik", tag: "food", tagLabel: "Restaurang", kidsLevel: "great", kidsNote: "Har barnmeny enligt uppgift, avslappnad miljö",
+      blurb: "Skaldjursrestaurang och delikatessbutik vid Kiviks hamn, med tre nivåer från enkel snabbmeny till lite finare. Barnmeny finns, och fin utsikt över hamnen från uteserveringen.",
+      address: "Brogatan 7, Kivik", hours: "Mån–tis 10–18, ons–lör 10–21, sön 10–16",
+      lat: 55.6873627, lng: 14.227457, placeId: "ChIJ95mACrxEVEYR45ZIBmn-2kk", website: "https://www.buhres.se/"
+    },
+    {
+      name: "Matöppet Skillinge", tag: "grocery", tagLabel: "Mataffär", kidsLevel: "good", kidsNote: "Vanlig mataffär, inget särskilt barnfokus men praktisk",
+      blurb: "Liten mataffär mitt i Skillinge (tidigare Skillinge Matbutik), gångavstånd från huset. Förvånansvärt bra utbud för sin storlek, bra för vardagshandling utan att behöva åka bil.",
+      address: "Strandgatan 36, Skillinge", hours: "Mån–fre 9–18, lör–sön 9–14",
+      lat: 55.4729577, lng: 14.2818133, placeId: "ChIJ8SX5vAlcVEYRU1tnMQPd0mY", website: "https://www.matoppet.se/butik/skillinge/"
+    },
+    {
+      name: "Coop Simrishamn", tag: "grocery", tagLabel: "Mataffär", kidsLevel: "good", kidsNote: "Vanlig mataffär, inget särskilt barnfokus men praktisk",
+      blurb: "Större matbutik i Simrishamn, en bit bort från Skillinge, med gott om parkering. Bra alternativ när ni vill handla lite mer eller behöver ett större utbud.",
+      address: "Gamla Järrestadsvägen 3b, Simrishamn", hours: "Öppet alla dagar 7–21",
+      lat: 55.5518855, lng: 14.3312669, placeId: "ChIJXbQgCrBEVEYRqA58xSbbzG4", website: "https://www.coop.se/butiker-erbjudanden/coop/coop-simrishamn/"
+    },
+    {
+      name: "Kapellgårdens café", tag: "food", tagLabel: "Fik", kidsLevel: "great", kidsNote: "Enkel och avslappnad miljö, glass lockar barnen",
+      blurb: "Mysigt litet café i Skillinge med uteplats i en fin gårdsmiljö. Kaffe, glass och bakverk till bra pris, ett enkelt fikastopp nära huset.",
+      address: "Kapellsträddet 6, Skillinge", hours: "Mån–lör 10–16, stängt söndagar",
+      lat: 55.4742823, lng: 14.2815309, placeId: "ChIJKRV4hAlcVEYR2IfczD2cch8", website: "https://www.svenskakyrkan.se/garsnas/nyheter/kapellgardens-cafe-skillinge"
+    },
+    {
+      name: "Hylkegården", tag: "food", tagLabel: "Fik", kidsLevel: "great", kidsNote: "Beskrivs som mycket barnvänligt i recensioner",
+      blurb: "Kombinerat café, bistro och presentbutik i Simrishamnstrakten. Gott om sittplatser inne och ute, stort urval av tårtor och bakverk, och enligt recensioner mycket barnvänligt.",
+      address: "Höga vägen 54, Simrishamn", hours: "Öppet alla dagar 11–17",
+      lat: 55.5024977, lng: 14.3235835, placeId: "ChIJv_Sn3XZbVEYRkDfhV8Tlw7U", website: "https://hylkegarden.se/"
+    },
+    {
+      name: "ICA Supermarket Brunnshallen", tag: "grocery", tagLabel: "Mataffär", kidsLevel: "good", kidsNote: "Vanlig mataffär, inget särskilt barnfokus men praktisk",
+      blurb: "Större ICA-butik i Simrishamn med gott om parkering. Enligt recensioner brett utbud och hjälpsam personal, bra alternativ till Coop om ni vill jämföra pris eller sortiment.",
+      address: "Kristianstadsvägen 4, Simrishamn", hours: "Öppet alla dagar 7–22",
+      lat: 55.5567638, lng: 14.3466303, placeId: "ChIJvwK0saREVEYRVuBDIPv4GIc", website: "https://www.ica.se/butiker/supermarket/simrishamn/ica-supermarket-simrishamn-1003463/"
+    },
+    {
+      name: "ICA Supermarket Kivik", tag: "grocery", tagLabel: "Mataffär", kidsLevel: "good", kidsNote: "Vanlig mataffär, inget särskilt barnfokus men praktisk",
+      blurb: "Den enda mataffären i Kivik, större än man kanske väntar sig för en så liten ort. Praktisk att handla i om ni ändå är i Kivik för musteriet eller stranden. Prisnivå något högre än i städerna.",
+      address: "Killebacken 6, Kivik", hours: "Öppet alla dagar 8–21",
+      lat: 55.6845613, lng: 14.2226469, placeId: "ChIJnYWHM1xqVEYRoHbAr__Jht0", website: "https://www.ica.se/butiker/supermarket/kivik/"
+    },
+    {
+      name: "Willys Simrishamn", tag: "grocery", tagLabel: "Mataffär", kidsLevel: "good", kidsNote: "Vanlig mataffär, inget särskilt barnfokus men praktisk",
+      blurb: "Prisvärt fullsortimentsvarhus i Simrishamn. Enligt recensioner ett av de bättre alternativen i stan med bra utbud och hjälpsam personal, ofta lite billigare än övriga kedjor.",
+      address: "Skanshillsgatan 2, Simrishamn", hours: "Öppet alla dagar 8–21",
+      lat: 55.5517947, lng: 14.3475646, placeId: "ChIJGbXk-g1FVEYRHmtiN5Yx4A0", website: "https://www.willys.se/butik/simrishamn/willys-skanshill-2291"
+    },
+    {
+      name: "Kåseberga Fisk", tag: "food", tagLabel: "Restaurang", kidsLevel: "good", kidsNote: "Enkel fisk och chips på bryggan, bra för hela familjen",
+      blurb: "Fiskrestaurang och butik direkt på bryggan vid Ales stenar i Kåseberga, med havsutsikt genom stora glaspartier. Fish and chips och ålburgare är klassiker enligt recensioner. Bra lunchstopp om ni ändå är vid stenarna.",
+      address: "Ales väg 54, Löderup (Kåseberga)", hours: "Mån–lör 10–19, sön 11–19",
+      lat: 55.3829515, lng: 14.0615492, placeId: "ChIJc3JdOpiKVEYRTuqgHrlAveY", website: "https://www.kaseberga-fisk.se/"
+    },
+    {
+      name: "Ångtåget Österlen", tag: "active", tagLabel: "Tågtur", kidsLevel: "great", kidsNote: "Kort och lagom resa, uppskattat även av små barn enligt recensioner",
+      blurb: "Nostalgiskt veterantåg som tuffar mellan Brösarp och Sankt Olof genom vackert landskap. Beskrivs som en go upplevelse även för riktigt små barn, och lagom lång resa så att man inte hinner bli rastlös. Glass finns att köpa i Sankt Olof.",
+      address: "Brösarps stationsväg 3, Brösarp", hours: "Kör vissa dagar, oftast söndagar – kolla aktuell tidtabell",
+      lat: 55.735099, lng: 14.124859, placeId: "ChIJzwvrjLlsVEYRvN7cW2Bu4-Q", website: "https://www.skanskajarnvagar.se/"
+    },
+    {
+      name: "Skånes Djurpark", tag: "active", tagLabel: "Djurpark", kidsLevel: "great", kidsNote: "Byggt för barn, hängbroar och lekplatser utspridda i skogen",
+      blurb: "Stor djurpark med fokus på nordiska djur som björn, varg och älg, i Höör en bit bort. Hängbroar i trädkronorna, traktorer i ett Bagge Shaun-tema och lekplatser utspridda i skogsmiljön. Enligt recensioner lätt att spendera flera timmar där. Ligger drygt 1 tim 15 min bort, så räkna med en heldagsutflykt.",
+      address: "Höör", hours: "Öppet alla dagar 10–19",
+      lat: 55.9631734, lng: 13.5365293, placeId: "ChIJo7oKzbfvU0YRHLzn7YO6Hxk", website: "https://www.skanesdjurpark.se/"
+    },
+    {
+      name: "Borrby Strandbad", tag: "water", tagLabel: "Bad", kidsLevel: "great", kidsNote: "Bred, långgrund sandstrand med dyner, bra för barn",
+      blurb: "Vit sandstrand med dyner en bit söder om Skillinge, ca 10 minuter bort. Gott om parkering vid huvudvägen. Beskrivs som en av de finaste och mest folktomma stränderna i trakten.",
+      address: "Granhyddevägen, Borrby", hours: "Alltid tillgänglig",
+      lat: 55.4338785, lng: 14.2363501, placeId: "ChIJDXRL7sNeVEYR6s3ZtnVxBfE"
+    },
+    {
+      name: "Kyls Strandbad", tag: "water", tagLabel: "Bad", kidsLevel: "great", kidsNote: "Fin sandstrand, lugnt och oexploaterat",
+      blurb: "Vacker, lugn sandstrand granne med Borrby strandbad, även den bara ca 10 minuter från Skillinge. Gratis parkering och betydligt mindre folk än de mer kända badplatserna längre norrut.",
+      address: "Kyhls strandväg, Borrby", hours: "Alltid tillgänglig",
+      lat: 55.437202, lng: 14.2387962, placeId: "ChIJK8SNKcFeVEYRSCAFWDOfl7Y"
+    },
+    {
+      name: "Badbryggan söder om Skillinge hamn", tag: "water", tagLabel: "Bad", kidsLevel: "mixed", kidsNote: "Mer för vuxendopp och krabbfiske än småbarnslek",
+      blurb: "Badstege och klippor precis söder om hamnen, vid utegymmet. Populärt för ett snabbt dopp och för att meta krabbor från klipporna. Gångavstånd från huset, men inte en klassisk sandstrand för de minsta.",
+      address: "Söder om Skillinge hamn", hours: "Alltid tillgänglig",
+      lat: 55.4718, lng: 14.2838, placeId: ""
+    },
+    {
+      name: "Kronovalls slott", tag: "nature", tagLabel: "Slottspark", kidsLevel: "good", kidsNote: "Kort, lugn promenad och en häcklabyrint som roar barnen",
+      blurb: "Vinslott med anor från 1760 mellan Tomelilla och Brösarp, mest känt för sin vackra slottspark med en imponerande häcklabyrint. Restaurang, vinkafé och butik på plats. En enkel och kort utflykt att kombinera med något annat på Österlen samma dag.",
+      address: "Kronovalls Vinslott, Skåne-Tranås", hours: "Parken går bra att besöka dagtid, café/restaurang har säsongsbundna öppettider",
+      lat: 55.641531, lng: 14.048432, placeId: "", website: "https://www.kronovall.se/"
+    },
+    {
+      name: "Fyledalen (Stenbyrundan)", tag: "nature", tagLabel: "Vandring", kidsLevel: "great", kidsNote: "Kort, lättgången slinga på 2,2 km med grillplats vid start",
+      blurb: "Ett av Skånes finare naturområden sydväst om Tomelilla, med omväxlande barr- och lövskog och öppet odlingslandskap. Stenbyrundan är en gul-vitmarkerad slinga på 2,2 km som passar bra för en kortare promenad med barn. Vid parkeringen finns rastplats, grillplats och informationstavlor.",
+      address: "Fyledalens naturreservat (Stenby), Tomelilla", hours: "Öppet dygnet runt",
+      lat: 55.547583, lng: 13.8685, placeId: "", website: "https://www.lansstyrelsen.se/skane/besoksmal/naturreservat/sjobo-tomelilla-ystad/fyledalen.html"
+    },
+    {
+      name: "Blå Tockabjärsleden (Verkeån)", tag: "nature", tagLabel: "Vandring", kidsLevel: "good", kidsNote: "Kort slinga på ca 2 km, bra alternativ till de längre Verkeån-lederna",
+      blurb: "En kortare, blåmarkerad slinga på ungefär 2 km i Verkeåns naturreservat nära Brösarp, en del av ett större nätverk av vandringsleder längs ån. Bra alternativ om ni vill ha en kort skogspromenad utan att behöva gå någon av de långa Skåneleden-etapperna. Kolla Naturkartan för exakt parkering innan ni åker, koordinaterna nedan är ungefärliga.",
+      address: "Verkeåns naturreservat (Tockabjär), nära Brösarp", hours: "Öppet dygnet runt",
+      lat: 55.715, lng: 14.16, placeId: "", website: "https://www.lansstyrelsen.se/skane/besoksmal/naturreservat/simrishamn-tomelilla/verkean-delomrade-1.html"
+    },
+    {
+      name: "Wanås Konst", tag: "nature", tagLabel: "Konst & skulptur", kidsLevel: "good", kidsNote: "Många skulpturer går att klättra på, bra för lite äldre barn",
+      blurb: "Skulpturpark i en atmosfärisk bokskog utanför Knislinge, med runt 70–80 permanenta konstverk av internationella konstnärer utspridda i parken och de gamla slottsbyggnaderna. Många verk går att klättra och leka på. Café/lunchrestaurang och butik på plats, samt utställningshall för tillfälliga utställningar. Ligger en bit bort (uppskattningsvis ca 1 tim 35 min från Skillinge), så räkna med att det blir en heldagsutflykt.",
+      address: "Wanås, 289 90 Knislinge", hours: "Säsongsöppet, kolla aktuella tider innan besök",
+      lat: 56.18606, lng: 14.04542, placeId: "", website: "https://www.wanaskonst.se/"
+    },
+    {
+      name: "Bäckaskog slott", tag: "history", tagLabel: "Slott", kidsLevel: "mixed", kidsNote: "Mest en lugn slottspark och promenad, inget särskilt riktat till barn",
+      blurb: "Anläggning från 1200-talet – kloster, kungligt sommarresidens och sedan 1935 statligt byggnadsminne – vackert beläget mellan två sjöar strax utanför Kristianstad. Slottspark med örtagård ner mot vattnet, restaurang och hotell på plats. Ligger en bit bort (uppskattningsvis ca 1 tim 10–15 min från Skillinge).",
+      address: "Barumsvägen 255, Fjälkinge", hours: "Parken tillgänglig dagtid, kolla restaurangens öppettider separat",
+      lat: 56.085455, lng: 14.349426, placeId: "", website: "https://backaskogslott.se/"
+    },
+    {
+      name: "Åhus (Täppet)", tag: "water", tagLabel: "Bad", kidsLevel: "great", kidsNote: "Grunt vatten och fin sand, en av Skånes populäraste familjestränder",
+      blurb: "Täppet är Åhus mest kända badstrand, med grunt vatten långt ut, fin sand och en 150 meter lång brygga (Åhusbryggan) att hoppa från. Kombinera gärna med en promenad i den mysiga småstaden Åhus och glass från den klassiska glassbåten. Obs: Absolut Home, besökscentret för Absolut Vodka, stängde permanent för allmänheten i mars 2024, så det är bad och stadspromenad som gäller numera. Ligger en bit bort (uppskattningsvis ca 55–65 min från Skillinge, precis i gränsen för en dagsutflykt).",
+      address: "Kantarellvägen, Åhus (Täppetstranden)", hours: "Alltid tillgänglig",
+      lat: 55.937039, lng: 14.319992, placeId: "", website: "https://www.kristianstad.se/upplevaochgora/badfriluftslivochmotion/badplatser/ahusbryggan.6294.html"
+    },
+    {
+      name: "Sjöfolket (Skillinge Fiskvagn)", tag: "food", tagLabel: "Restaurang", kidsLevel: "good", kidsNote: "Enkel lunchrestaurang, gångavstånd från huset",
+      blurb: "Fiskrestaurang och fiskaffär vid hamnen i Skillinge, gångavstånd från huset. Sillburgare, silltallrik och smörgåstårta på menyn, plus färsk fisk att köpa med sig hem. Säsongsöppet ungefär från midsommar till slutet av sommaren.",
+      address: "Fiskhamnen, Skillinge", hours: "Mån–fre 10–18, lör 10–16, stängt söndagar (säsongsöppet sommartid)",
+      lat: 55.4749, lng: 14.2848, placeId: "", website: "https://sjofolket.se/skillinge-fiskvagn/"
+    },
+    {
+      name: "Bobergs på Hamngården", tag: "food", tagLabel: "Restaurang", kidsLevel: "mixed", kidsNote: "Mer finstämd kvällsrestaurang, kolla barnmeny innan",
+      blurb: "Anrik familjedriven restaurang med rum för övernattning, vackert beläget vid södra hamnen i Brantevik. Skånska råvaror i säsong möter smaker från hela världen. Bokning rekommenderas, särskilt kvällstid.",
+      address: "Östersjögatan 94, Brantevik", hours: "Varierande säsongsöppettider, boka bord i förväg",
+      lat: 55.5138, lng: 14.3475, placeId: "", website: "https://www.hamngarden.se/bobergs-p"
+    },
+    {
+      name: "VYN Restaurant", tag: "food", tagLabel: "Restaurang", kidsLevel: "mixed", kidsNote: "Fine dining, mer för vuxna än barn, boka bord i god tid",
+      blurb: "Daniel Berlins restaurang mellan Skillinge och Brantevik, tilldelad två stjärnor i Guide Michelin 2024. Avsmakningsmeny med fokus på lokala råvaror. En riktig höjdpunkt om ni vill unna er en vuxenkväll under resan, men boka bord långt i förväg och räkna med ett högre prisläge.",
+      address: "Höga Vägen 72, Gislövshammar (mellan Skillinge och Brantevik)", hours: "Middag ons–fre 18–24, lunch lör 13–17",
+      lat: 55.4955, lng: 14.3145, placeId: "", website: "https://vynrestaurant.se/"
+    },
+    {
+      name: "Kabusa Lars Lerin", tag: "nature", tagLabel: "Konst", kidsLevel: "mixed", kidsNote: "Konstutställning, mest för vuxna, men café och gott om plats att röra sig på",
+      blurb: "Helt ny konsthall i Köpingebro (öppnade våren 2026), grundad och ägd av akvarellkonstnären Lars Lerin själv. Stor permanent utställning med verk från hans 30 år som konstnär. Café och parkering på plats. Ligger vid Ystad, en bit från Skillinge men inom bekvämt räckhåll för en utflyktsdag.",
+      address: "Österleden 1068, Köpingebro", hours: "Tis–sön 11–16, stängt måndagar (samt vissa helgdagar)",
+      lat: 55.437267, lng: 13.983168, placeId: "", website: "https://sandgrund.org/kabusa-lars-lerin/"
+    },
+    {
+      name: "Hasse & Tage-museet", tag: "history", tagLabel: "Museum", kidsLevel: "mixed", kidsNote: "Litet och nostalgiskt, mest för vuxna som minns Hasse och Tage – inte mycket att göra för de minsta",
+      blurb: "Kallar sig självt \"världens minsta filmmuseum\" – bara 17 kvadratmeter i en gammal tegelbyggnad vid järnvägen i centrala Tomelilla, om komikerduon Hasse Alfredsons och Tage Danielssons filmer och livsverk. Kul kuriosastopp om ni ändå är i trakten, men räkna med ett kort besök snarare än en heldagsutflykt – och entrén är på den dyrare sidan för hur litet stället är (1000 kr flat för grupper under 8 personer).",
+      address: "Bangatan 2, Tomelilla", hours: "Tis–sön 11–15",
+      lat: 55.544918, lng: 13.949393, placeId: "", website: "https://hasseotagemuseet.se/"
+    },
+    {
+      name: "O'Learys Ystad", tag: "rain", tagLabel: "Bowling", kidsLevel: "great", kidsNote: "Bowling brukar falla i god smak hos hela familjen, oavsett väder",
+      blurb: "Bowlinghall med tolv banor plus restaurang och sportbar, en bra reservplan för en regnig dag eller kväll när barnen behöver spring i benen. Ligger i Ystad, går fint att kombinera med Ystad Arena eller Ystad Studios samma dag.",
+      address: "Fridhemsgatan 27, Ystad", hours: "Mån–tis 11–21, ons–tors 11–22, fre–lör 11–01, sön 12–21",
+      lat: 55.4332351, lng: 13.8342735, placeId: "", website: "https://olearys.com/sv-se/ystad/"
+    },
+    {
+      name: "Österlens museum", tag: "history", tagLabel: "Museum", kidsLevel: "good", kidsNote: "Gratis entré, ett enkelt och billigt kort besök även vid dåligt väder",
+      blurb: "Kulturhistoriskt museum mitt i Simrishamn med fri entré till alla utställningar året runt. Bra reservplan vid regn, och ni behöver inte planera in en hel dag kring det – ett kortare besök räcker gott.",
+      address: "Storgatan 24, Simrishamn", hours: "Sommaröppettider (jul–aug): tis–fre 11–17, lör–sön 11–15",
+      lat: 55.5564072, lng: 14.3477497, placeId: "", website: "https://www.simrishamn.se/kultur/osterlens-museum"
+    },
+    {
+      name: "Forsemölla vattenfall", tag: "nature", tagLabel: "Vattenfall", kidsLevel: "mixed", kidsNote: "Vacker men brant och kuperad stig, går inte med barnvagn – bäst för barn som går säkert själva",
+      blurb: "Ett omkring 15 meter högt vattenfall i Sträntemölla-Forsemölla naturreservat, en kortare vandring från parkeringen genom bokskog och förbi forsande vatten. En riktig \"dold pärla\" som få hittar till, men terrängen är brant och otillgänglig så räkna med att bära de allra minsta hela eller delar av vägen.",
+      address: "Sträntemölla-Forsemölla naturreservat, nära Gärsnäs", hours: "Alltid tillgängligt",
+      lat: 55.6173773, lng: 14.2341471, placeId: "", website: "https://www.lansstyrelsen.se/skane/besoksmal/naturreservat/simrishamn/strantemolla-forsemolla.html"
+    },
+    {
+      name: "Ravlunda strand", tag: "water", tagLabel: "Bad", kidsLevel: "great", kidsNote: "Långgrund och vidsträckt, gott om plats även en fullsatt sommardag",
+      blurb: "Tre kilometer lång, öppen sandstrand längs Ravlundafältet, en av de finaste på norra Österlen. Stranden ligger på Försvarsmaktens skjutfält men är öppen för allmänheten till fots och cykel när inga övningar pågår. Enligt Försvarsmaktens schema för sommaren 2026 finns inga tillträdesförbud under er vistelse (26 juli–1 augusti), men respektera alltid skyltar och bommar på plats ifall något ändras.",
+      address: "Ravlunda, norra Österlen", hours: "Kontrollera aktuella tillträdesförbud på forsvarsmakten.se/p7 innan besök",
+      lat: 55.7100819, lng: 14.1512891, placeId: "", website: "https://www.forsvarsmakten.se/regler-och-tillstand/skjutfalt-och-forbud/ravlunda-skjutfalt/"
+    }
+  ];
+
+  var BORNHOLM_ACTIVITIES = [
+    {
+      name: "Rønne", tag: "nature", tagLabel: "Hamnstad", kidsLevel: "good", kidsNote: "Korta avstånd, bra om ni vill ta det lugnt med de minsta",
+      blurb: "Bornholms största stad och hamn, dit färjan går. Mysig hamnstad med korta avstånd till det mesta, bra om ni inte vill resa långt med de minsta eller helst vill ta det lugnt.",
+      address: "Rønne, Bornholm", hours: "Alltid tillgänglig",
+      lat: 55.1009, lng: 14.7066, placeId: ""
+    },
+    {
+      name: "Hammershus", tag: "history", tagLabel: "Borgruin", kidsLevel: "great", kidsNote: "Spännande historier för barn, guidade barnvisningar på loven, bad nedanför vid Hammerhavn",
+      blurb: "Nordens största borgruin, ca 25 min från Rønne. Barnen kan höra spännande historier om kungadottern i fångtornet och soldaternas liv, och under sommar-/höstlovet finns guidade visningar särskilt för barnfamiljer. Nedanför borgen ligger Hammerhavn där även de minsta kan bada, och det går båtturer in i grottorna i klipporna.",
+      address: "Hammershus, Bornholm", hours: "Ruinen alltid tillgänglig, besökscentret har säsongsbundna öppettider",
+      lat: 55.2713045, lng: 14.7553955, placeId: "", website: "https://bornholm.info/en/hammershus/"
+    },
+    {
+      name: "Dueodde", tag: "water", tagLabel: "Bad", kidsLevel: "great", kidsNote: "Spång på över 500 m genom dynerna, funkar bra med barnvagn",
+      blurb: "Bornholms finaste sandstrand, ca 40 min från Rønne, känd för sin exceptionellt fina, ljusa sand. Sluttar mjukt ner mot vattnet och passar mycket bra för barnfamiljer. Från parkeringen leder en trädäcksspång på över 500 m genom dynerna, bra för barnvagn/rullstol. Toaletter med skötbord, kiosk och busshållplats vid parkeringen.",
+      address: "Dueodde, Bornholm", hours: "Alltid tillgänglig",
+      lat: 54.991835, lng: 15.074352, placeId: ""
+    },
+    {
+      name: "NaturBornholm", tag: "rain", tagLabel: "Museum", kidsLevel: "great", kidsNote: "Inomhus/utomhus, bra reservplan vid regn",
+      blurb: "Upplevelsecenter och naturmuseum i Aakirkeby, ca 15 min från Rønne. Dinosaurier, jordbävningssimulator, Östersjöakvarium och en tidsmaskin, plus naturstigar utomhus och 3D-biograf. Blandar inne- och uteaktiviteter för barn, ett bra alternativ om vädret krånglar.",
+      address: "Grønningen 30, Aakirkeby", hours: "Säsongsbundna öppettider, kolla innan besök",
+      lat: 55.0641, lng: 14.9174, placeId: "", website: "https://bornholm.info/en/naturbornholm/"
+    },
+    {
+      name: "Brændesgårdshaven", tag: "active", tagLabel: "Nöjespark", kidsLevel: "great", kidsNote: "Danmarks äldsta lekland, sannolikt roligast rent barnfokuserat",
+      blurb: "Nöjespark och minizoo nära Svaneke, ca 45 min från Rønne. Vattenland, karuseller, studsmattor, lekplatser och djurhägn. Ligger längst bort av alternativen på ön, så räkna med att det tar en större del av dagen.",
+      address: "Højevejen 4, Svaneke", hours: "Säsongsöppet, kolla aktuella tider innan besök",
+      lat: 55.1292, lng: 15.1036, placeId: "", website: "https://www.braendesgaardshaven.com/"
+    }
+  ];
+
+  var MAP_BOUNDS = { minLat: 55.35, maxLat: 55.77, minLng: 13.75, maxLng: 14.38 };
+  var MAP_W = 800, MAP_H = 380;
+  var TAG_COLORS = {water:'#2f6f9e', nature:'#3b7a3f', food:'#b5762a', grocery:'#5c7a3f', history:'#6b4f9e', play:'#c1447a', rain:'#6b6357', active:'#8f2e26'};
+
+  function projectPoint(lat, lng){
+    var xr = (lng - MAP_BOUNDS.minLng) / (MAP_BOUNDS.maxLng - MAP_BOUNDS.minLng);
+    var yr = 1 - (lat - MAP_BOUNDS.minLat) / (MAP_BOUNDS.maxLat - MAP_BOUNDS.minLat);
+    var x = xr * MAP_W, y = yr * MAP_H;
+    var clamped = false;
+    if(x < 10){ x = 10; clamped = true; } if(x > MAP_W - 10){ x = MAP_W - 10; clamped = true; }
+    if(y < 10){ y = 10; clamped = true; } if(y > MAP_H - 10){ y = MAP_H - 10; clamped = true; }
+    return { x: x, y: y, clamped: clamped };
+  }
+
+  var WEEKDAYS = ["Sön","Mån","Tis","Ons","Tor","Fre","Lör"];
+
+  function windArrow(dirDeg){
+    var deg = (typeof dirDeg === 'number') ? dirDeg : 0;
+    return '<svg viewBox="0 0 24 24" width="13" height="13" style="transform:rotate(' + deg + 'deg); flex-shrink:0;">' +
+      '<line x1="12" y1="20" x2="12" y2="5" stroke="#5c4c38" stroke-width="2.5" stroke-linecap="round"/>' +
+      '<polyline points="7,10 12,4 17,10" fill="none" stroke="#5c4c38" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+      '</svg>';
+  }
+
+  function wxIcon(code, precipProb){
+    var rainCodes = [51,53,55,61,63,65,80,81,82];
+    if(rainCodes.indexOf(code) > -1 && (typeof precipProb !== 'number' || precipProb < 35)){
+      code = 3;
+    }
+    if(code === 0 || code === 1){
+      return '<svg viewBox="0 0 24 24" width="26" height="26"><circle cx="12" cy="12" r="5" fill="#d99a2b"/><g stroke="#d99a2b" stroke-width="2" stroke-linecap="round"><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/><line x1="4.2" y1="4.2" x2="6.3" y2="6.3"/><line x1="17.7" y1="17.7" x2="19.8" y2="19.8"/><line x1="4.2" y1="19.8" x2="6.3" y2="17.7"/><line x1="17.7" y1="6.3" x2="19.8" y2="4.2"/></g></svg>';
+    }
+    if(code === 2){
+      return '<svg viewBox="0 0 24 24" width="26" height="26"><circle cx="9" cy="9" r="4.5" fill="#d99a2b"/><path d="M8 19a4.2 4.2 0 0 1-.5-8.37A5.3 5.3 0 0 1 17.5 9.5 4.7 4.7 0 0 1 19 19H8z" fill="#b5aa99"/></svg>';
+    }
+    if(code === 3){
+      return '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M6 17a4.3 4.3 0 0 1-.5-8.53A5.3 5.3 0 0 1 15.5 7.5 4.8 4.8 0 0 1 17 17H6z" fill="#8a8578"/></svg>';
+    }
+    if(code === 45 || code === 48){
+      return '<svg viewBox="0 0 24 24" width="26" height="26"><g stroke="#9a9284" stroke-width="2" stroke-linecap="round"><line x1="3" y1="7" x2="21" y2="7"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="17" x2="21" y2="17"/></g></svg>';
+    }
+    if([51,53,55,61,63,65,80,81,82].indexOf(code) > -1){
+      return '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M7 12a4 4 0 0 1-.5-7.97A5 5 0 0 1 16 2.06 4.5 4.5 0 0 1 17.5 12H7z" fill="#8a8578"/><g stroke="#2f6f9e" stroke-width="2" stroke-linecap="round"><line x1="8" y1="15.5" x2="6.5" y2="20.5"/><line x1="12" y1="15.5" x2="10.5" y2="20.5"/><line x1="16" y1="15.5" x2="14.5" y2="20.5"/></g></svg>';
+    }
+    if([71,73,75].indexOf(code) > -1){
+      return '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M7 12a4 4 0 0 1-.5-7.97A5 5 0 0 1 16 2.06 4.5 4.5 0 0 1 17.5 12H7z" fill="#8a8578"/><g fill="#6b8fae"><circle cx="8" cy="17" r="1.4"/><circle cx="12" cy="18.5" r="1.4"/><circle cx="16" cy="17" r="1.4"/></g></svg>';
+    }
+    if([95,96,99].indexOf(code) > -1){
+      return '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M7 11a4 4 0 0 1-.5-7.97A5 5 0 0 1 16 1.06 4.5 4.5 0 0 1 17.5 11H7z" fill="#8a8578"/><polygon points="13,11 10,17 13,17 11,21 16,14 13,14" fill="#c1447a"/></svg>';
+    }
+    return '<svg viewBox="0 0 24 24" width="26" height="26"><path d="M6 17a4.3 4.3 0 0 1-.5-8.53A5.3 5.3 0 0 1 15.5 7.5 4.8 4.8 0 0 1 17 17H6z" fill="#8a8578"/></svg>';
+  }
+
+  function uvBadge(uv){
+    if(typeof uv !== 'number') return '';
+    var level = uv >= 8 ? {l:'Mycket hög', c:'#8f2e26'} : uv >= 6 ? {l:'Hög', c:'#b5762a'} : uv >= 3 ? {l:'Måttlig', c:'#8a8020'} : {l:'Låg', c:'#3b7a3f'};
+    return '<span class="wx-stat wx-uv" style="background:' + level.c + ';" title="UV-index ' + uv + ' (' + level.l + ') – solskydd rekommenderas vid 3+">UV ' + Math.round(uv) + '</span>';
+  }
+
+  async function loadWeather(){
+    var el = document.getElementById('weather-row');
+    if(!el) return;
+    try{
+      var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + HOME.lat + '&longitude=' + HOME.lng +
+        '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,precipitation_probability_max,wind_speed_10m_max,wind_direction_10m_dominant,uv_index_max' +
+        '&wind_speed_unit=ms&timezone=Europe%2FStockholm' +
+        '&start_date=2026-07-26&end_date=2026-08-01';
+      var res = await fetch(url);
+      if(!res.ok) throw new Error('Väderdata kunde inte hämtas');
+      var data = await res.json();
+      var days = data.daily.time;
+      el.innerHTML = '';
+      var bestIdx = -1, bestScore = -999;
+      days.forEach(function(dateStr, idx){
+        var d = new Date(dateStr + 'T00:00:00');
+        var code = (data.daily.weather_code || data.daily.weathercode)[idx];
+        var max = Math.round(data.daily.temperature_2m_max[idx]);
+        var min = Math.round(data.daily.temperature_2m_min[idx]);
+        var rain = Math.round(data.daily.precipitation_sum[idx] * 10) / 10;
+        var precipProb = data.daily.precipitation_probability_max ? data.daily.precipitation_probability_max[idx] : null;
+        var windSpeed = data.daily.wind_speed_10m_max ? Math.round(data.daily.wind_speed_10m_max[idx]) : null;
+        var windDir = data.daily.wind_direction_10m_dominant ? data.daily.wind_direction_10m_dominant[idx] : null;
+        var uv = data.daily.uv_index_max ? data.daily.uv_index_max[idx] : null;
+
+        var score = max - (typeof windSpeed === 'number' ? windSpeed * 0.6 : 0) - (typeof precipProb === 'number' ? precipProb * 0.15 : 0);
+        if(score > bestScore){ bestScore = score; bestIdx = idx; }
+
+        var card = document.createElement('div');
+        card.className = 'wx-card';
+        var stats = '';
+        if(typeof precipProb === 'number' && precipProb >= 20){
+          stats += '<span class="wx-stat wx-rain">☂ ' + precipProb + '%' + (rain >= 1 ? ' · ' + rain + 'mm' : '') + '</span>';
+        }
+        if(typeof windSpeed === 'number'){
+          stats += '<span class="wx-stat wx-wind">' + windArrow(windDir) + ' ' + windSpeed + ' m/s</span>';
+        }
+        stats += uvBadge(uv);
+        card.innerHTML =
+          '<div class="wx-card-top">' +
+            '<div class="wx-daydate"><div class="wx-day">' + WEEKDAYS[d.getDay()] + '</div><div class="wx-date">' + d.getDate() + '/' + (d.getMonth()+1) + '</div></div>' +
+            '<div class="wx-icon">' + wxIcon(code, precipProb) + '</div>' +
+            '<div class="wx-temp">' + max + '° <span class="lo">' + min + '°</span></div>' +
+          '</div>' +
+          (stats ? '<div class="wx-stats">' + stats + '</div>' : '');
+        el.appendChild(card);
+      });
+      var noteEl = document.querySelector('.weather-note');
+      if(noteEl && bestIdx > -1){
+        var bestDate = new Date(days[bestIdx] + 'T00:00:00');
+        var bestNames = ['söndag','måndag','tisdag','onsdag','torsdag','fredag','lördag'];
+        var existing = document.getElementById('best-beach-day');
+        if(existing) existing.remove();
+        var tip = document.createElement('p');
+        tip.id = 'best-beach-day';
+        tip.style.cssText = 'font-size:12px; color:var(--accent); font-weight:600; margin:0 0 10px;';
+        tip.textContent = '🏖 Bästa baddagen ser ut att bli ' + bestNames[bestDate.getDay()] + ' ' + bestDate.getDate() + '/' + (bestDate.getMonth()+1) + '!';
+        noteEl.parentNode.insertBefore(tip, noteEl);
+      }
+    }catch(e){
+      el.innerHTML = '<p class="weather-fallback">Kunde inte hämta prognosen just nu. Se <a href="https://www.yr.no/en/forecast/daily-table/5-262500/Sweden/Skillinge" target="_blank" rel="noopener">yr.no</a> istället.</p>';
+    }
+  }
+
+  function haversineKm(lat1, lng1, lat2, lng2){
+    var R = 6371;
+    var dLat = (lat2 - lat1) * Math.PI / 180;
+    var dLng = (lng2 - lng1) * Math.PI / 180;
+    var a = Math.sin(dLat/2) * Math.sin(dLat/2) + Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) * Math.sin(dLng/2) * Math.sin(dLng/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  function slugify(s){
+    return s.toLowerCase().replace(/[åä]/g,'a').replace(/ö/g,'o').replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,'');
+  }
+
+  window.openActivityCard = function(slug){
+    var card = document.getElementById('act-card-' + slug);
+    if(!card) return;
+    card.classList.add('open');
+    card.querySelector('.act-head') && card.querySelector('.act-head').setAttribute('aria-expanded', 'true');
+    card.classList.remove('hidden');
+    card.scrollIntoView({behavior:'smooth', block:'center'});
+  };
+
+  function findPlaceCoords(placeName){
+    var lower = placeName.trim().toLowerCase();
+    if(lower.indexOf('skillinge') > -1) return HOME;
+    var match = ACTIVITIES.filter(function(a){ return a.name.toLowerCase() === lower; })[0];
+    if(match) return match;
+    match = ACTIVITIES.filter(function(a){ return a.name.toLowerCase().indexOf(lower) > -1 || lower.indexOf(a.name.toLowerCase()) > -1; })[0];
+    return match || null;
+  }
+
+  function collectCheckinPins(){
+    var pins = [];
+    Object.keys(state.checkins || {}).forEach(function(name){
+      var entry = state.checkins[name];
+      var place = (typeof entry.lat === 'number' && typeof entry.lng === 'number')
+        ? { lat: entry.lat, lng: entry.lng }
+        : findPlaceCoords(entry.status);
+      if(!place) return;
+      var label = name + (entry.status ? ' – ' + entry.status : '') + (entry.until ? ' (till kl ' + entry.until + ')' : '') + (entry.lat ? ' (GPS-position)' : '');
+      pins.push({ lat: place.lat, lng: place.lng, label: label });
+    });
+    return pins;
+  }
+
+  var tripMap = null;
+  var checkinLayer = null;
+  var actMarkers = [];
+  var allMaps = [];
+  function watchMap(m){
+    allMaps.push(m);
+    [150, 400, 900, 1800].forEach(function(delay){
+      setTimeout(function(){ if(m) m.invalidateSize(); }, delay);
+    });
+  }
+  window.addEventListener('resize', function(){
+    allMaps.forEach(function(m){ if(m) m.invalidateSize(); });
+  });
+  window.addEventListener('orientationchange', function(){
+    setTimeout(function(){ allMaps.forEach(function(m){ if(m) m.invalidateSize(); }); }, 300);
+  });
+
+  function initMap(){
+    if(tripMap || !window.L) return;
+    tripMap = L.map('trip-map', {scrollWheelZoom:false}).setView([55.55, 14.2], 9);
+    watchMap(tripMap);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 18, subdomains: 'abcd'
+    }).addTo(tripMap);
+    var homeIcon = L.divIcon({
+      html: '<div style="position:relative; width:26px; height:26px;">' +
+              '<div style="position:absolute; inset:0; border-radius:50%; border:3px solid #e0473d; box-shadow:0 0 0 3px rgba(224,71,61,0.3), 0 2px 6px rgba(0,0,0,0.45);"></div>' +
+              '<div style="position:absolute; top:6px; left:6px; width:14px; height:14px; border-radius:50%; background:#2f6f5e; border:2px solid #fdf6e6;"></div>' +
+            '</div>',
+      className: '', iconSize:[26,26], iconAnchor:[13,13]
+    });
+    var homeMarker = L.marker([HOME.lat, HOME.lng], {icon: homeIcon, zIndexOffset: 1000}).addTo(tripMap).bindPopup('<b>' + HOME.name + '</b>');
+    var narrowScreen = window.innerWidth < 480;
+    homeMarker.bindTooltip('Skillinge – här bor vi', narrowScreen
+      ? {permanent:true, direction:'top', offset:[0,-14], className:'home-tooltip'}
+      : {permanent:true, direction:'right', offset:[16,0], className:'home-tooltip'});
+    ACTIVITIES.forEach(function(a){
+      var color = TAG_COLORS[a.tag] || '#8f6039';
+      var icon = L.divIcon({
+        html: '<div style="width:14px;height:14px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:' + color + ';border:1.5px solid #fdf6e6;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div>',
+        className: '', iconSize:[14,14], iconAnchor:[7,14]
+      });
+      var slug = slugify(a.name);
+      var dirUrl = 'https://www.google.com/maps/dir/?api=1&origin=' + HOME.lat + ',' + HOME.lng + '&destination=' + a.lat + ',' + a.lng + '&destination_place_id=' + a.placeId;
+      var popupHtml = '<b>' + a.name + '</b><br>' + a.tagLabel + '<br>' + a.address +
+        '<br><a href="#act-card-' + slug + '" onclick="window.openActivityCard(\'' + slug + '\'); return false;">Visa i listan</a>' +
+        ' &middot; <a href="' + dirUrl + '" target="_blank" rel="noopener">Vägbeskrivning</a>';
+      var marker = L.marker([a.lat, a.lng], {icon: icon}).addTo(tripMap).bindPopup(popupHtml);
+      actMarkers.push({marker: marker, tag: a.tag, kids: a.kidsLevel});
+    });
+    checkinLayer = L.layerGroup().addTo(tripMap);
+    setTimeout(function(){ tripMap.invalidateSize(); }, 150);
+    renderCheckinPins();
+  }
+
+  function addCheckinMarkersTo(layerGroup){
+    var bounds = [];
+    collectCheckinPins().forEach(function(c){
+      var initials = c.label.trim().slice(0, 2).toUpperCase();
+      var icon = L.divIcon({
+        html: '<div style="width:24px;height:24px;border-radius:50% 50% 0 50%;transform:rotate(45deg);background:#7f4ab7;border:2px solid #fdf6e6;box-shadow:0 1px 4px rgba(0,0,0,0.45); display:flex; align-items:center; justify-content:center;">' +
+                '<span style="transform:rotate(-45deg); font-size:9px; font-weight:700; color:#fdf6e6;">' + initials + '</span>' +
+              '</div>',
+        className: '', iconSize:[24,24], iconAnchor:[12,24]
+      });
+      L.marker([c.lat, c.lng], {icon: icon, zIndexOffset: 800}).addTo(layerGroup).bindPopup('<b>' + c.label + '</b>');
+      bounds.push([c.lat, c.lng]);
+    });
+    return bounds;
+  }
+
+  function renderCheckinPins(){
+    if(!checkinLayer) return;
+    checkinLayer.clearLayers();
+    addCheckinMarkersTo(checkinLayer);
+  }
+
+  var whereisMap = null;
+  var whereisMapInited = false;
+  var whereisCheckinLayer = null;
+
+  function initWhereisMap(){
+    var mapEl = document.getElementById('whereis-map');
+    if(whereisMap || !window.L || !mapEl) return;
+    whereisMap = L.map('whereis-map', {scrollWheelZoom:false}).setView([HOME.lat, HOME.lng], 11);
+    watchMap(whereisMap);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:18, subdomains:'abcd'}).addTo(whereisMap);
+    var homeIcon = L.divIcon({
+      html: '<div style="width:16px;height:16px;border-radius:50%;background:#2f6f5e;border:2px solid #fdf6e6;box-shadow:0 1px 4px rgba(0,0,0,0.4);"></div>',
+      className: '', iconSize:[16,16], iconAnchor:[8,8]
+    });
+    L.marker([HOME.lat, HOME.lng], {icon: homeIcon}).addTo(whereisMap).bindPopup('<b>' + HOME.name + '</b>');
+    whereisCheckinLayer = L.layerGroup().addTo(whereisMap);
+    renderWhereisMapPins();
+  }
+
+  function renderWhereisMapPins(){
+    if(!whereisCheckinLayer || !whereisMap) return;
+    whereisCheckinLayer.clearLayers();
+    var bounds = addCheckinMarkersTo(whereisCheckinLayer);
+    bounds.push([HOME.lat, HOME.lng]);
+    if(bounds.length){ whereisMap.fitBounds(bounds, {padding:[30,30], maxZoom:13}); }
+  }
+
+  var activeFilter = 'all';
+  var activeKidsFilter = 'all';
+  var TAG_LABELS = {rain:"Regnig dag", water:"Bad", food:"Restaurang/fik", grocery:"Mataffär", nature:"Natur", history:"Historia", play:"Lekplats/gård", active:"Aktivt"};
+  var KIDS_LABELS = {great:"Mycket barnvänligt", good:"Barnvänligt", mixed:"Bäst för äldre/vuxna"};
+
+  function renderFilters(){
+    var el = document.getElementById('filters');
+    el.innerHTML = '';
+    var tags = ['all'];
+    ACTIVITIES.forEach(function(a){ if(tags.indexOf(a.tag) === -1) tags.push(a.tag); });
+    tags.forEach(function(t){
+      var btn = document.createElement('button');
+      btn.className = 'filter-chip' + (activeFilter === t ? ' active' : '');
+      btn.textContent = t === 'all' ? 'Alla' : (TAG_LABELS[t] || t);
+      btn.addEventListener('click', function(){
+        activeFilter = t;
+        renderFilters();
+        applyFilter();
+      });
+      el.appendChild(btn);
+    });
+    renderKidsFilters();
+  }
+
+  function renderKidsFilters(){
+    var el = document.getElementById('kids-filters');
+    if(!el) return;
+    el.innerHTML = '';
+    var levels = ['all'];
+    ACTIVITIES.forEach(function(a){ if(a.kidsLevel && levels.indexOf(a.kidsLevel) === -1) levels.push(a.kidsLevel); });
+    levels.forEach(function(lv){
+      var btn = document.createElement('button');
+      btn.className = 'kids-chip' + (activeKidsFilter === lv ? ' active' : '');
+      btn.textContent = lv === 'all' ? 'Alla barnvänlighetsnivåer' : (KIDS_LABELS[lv] || lv);
+      btn.addEventListener('click', function(){
+        activeKidsFilter = lv;
+        renderKidsFilters();
+        applyFilter();
+      });
+      el.appendChild(btn);
+    });
+  }
+
+  function applyFilter(){
+    document.querySelectorAll('.act-card').forEach(function(card){
+      var show = (activeFilter === 'all' || card.dataset.tag === activeFilter) &&
+                 (activeKidsFilter === 'all' || card.dataset.kids === activeKidsFilter);
+      card.classList.toggle('hidden', !show);
+    });
+    if(tripMap){
+      actMarkers.forEach(function(entry){
+        var show = (activeFilter === 'all' || entry.tag === activeFilter) &&
+                   (activeKidsFilter === 'all' || entry.kids === activeKidsFilter);
+        if(show && !tripMap.hasLayer(entry.marker)){
+          entry.marker.addTo(tripMap);
+        } else if(!show && tripMap.hasLayer(entry.marker)){
+          tripMap.removeLayer(entry.marker);
+        }
+      });
+    }
+  }
+
+  function buildActivityCard(a, opts){
+    opts = opts || {};
+    var card = document.createElement('div');
+    card.className = 'act-card';
+    card.id = 'act-card-' + slugify(a.name);
+    card.dataset.tag = a.tag;
+    card.dataset.kids = a.kidsLevel || '';
+    var mapUrl = opts.mapMode === 'search'
+      ? 'https://www.google.com/maps/search/?api=1&query=' + a.lat + ',' + a.lng
+      : 'https://www.google.com/maps/dir/?api=1&origin=' + HOME.lat + ',' + HOME.lng + '&destination=' + a.lat + ',' + a.lng + '&destination_place_id=' + (a.placeId || '');
+    var mapLabel = opts.mapMode === 'search' ? 'Visa på karta' : 'Vägbeskrivning';
+    card.innerHTML =
+      '<button class="act-head" aria-expanded="false">' +
+        '<span class="act-name"></span>' +
+        '<span class="badge ' + a.tag + '"></span>' +
+        '<span class="act-chevron">&#9662;</span>' +
+      '</button>' +
+      '<div class="act-body">' +
+        '<p class="act-blurb"></p>' +
+        '<div class="act-meta act-address"></div>' +
+        '<div class="act-meta act-hours"></div>' +
+        '<div class="kids-badge ' + (a.kidsLevel || '') + '"></div>' +
+        '<p class="kids-note"></p>' +
+        '<div class="star-rating"></div>' +
+        '<div class="act-actions">' +
+          '<a class="primary" href="' + mapUrl + '" target="_blank" rel="noopener">' + mapLabel + '</a>' +
+          (a.website ? '<a href="' + a.website + '" target="_blank" rel="noopener">Hemsida ↗</a>' : '') +
+        '</div>' +
+        '<div class="act-schedule-row">' +
+          '<input type="date" class="act-date-input" aria-label="Välj dag">' +
+          '<button class="act-add">Lägg till i schema</button>' +
+        '</div>' +
+      '</div>';
+    card.querySelector('.act-name').textContent = a.name;
+    card.querySelector('.badge').textContent = a.tagLabel;
+    card.querySelector('.act-blurb').textContent = a.blurb;
+    card.querySelector('.act-address').textContent = a.address;
+    card.querySelector('.act-hours').textContent = a.hours;
+    card.querySelector('.kids-badge').textContent = KIDS_LABELS[a.kidsLevel] || '';
+    card.querySelector('.kids-note').textContent = a.kidsNote || '';
+    renderStarRating(card.querySelector('.star-rating'), a.name);
+    card.querySelector('.act-head').addEventListener('click', function(){
+      card.classList.toggle('open');
+      this.setAttribute('aria-expanded', card.classList.contains('open') ? 'true' : 'false');
+    });
+    card.querySelector('.act-add').addEventListener('click', function(e){
+      e.stopPropagation();
+      var addBtn = card.querySelector('.act-add');
+      var dateVal = card.querySelector('.act-date-input').value;
+      state.schedule.push({id: uid(), date: dateVal, text: a.name});
+      saveState(); renderSchedule();
+      var oldText = addBtn.textContent;
+      addBtn.textContent = '✓ Tillagt i schemat';
+      addBtn.classList.add('added');
+      addBtn.disabled = true;
+      setTimeout(function(){
+        addBtn.textContent = oldText;
+        addBtn.classList.remove('added');
+        addBtn.disabled = false;
+      }, 1800);
+    });
+    return card;
+  }
+
+  function renderActivities(){
+    renderFilters();
+    var grid = document.getElementById('activity-grid');
+    grid.innerHTML = '';
+    ACTIVITIES.forEach(function(a){
+      grid.appendChild(buildActivityCard(a, {mapMode: 'directions'}));
+    });
+    applyFilter();
+  }
+
+  function renderBornholmActivities(){
+    var grid = document.getElementById('bornholm-activity-grid');
+    if(!grid) return;
+    grid.innerHTML = '';
+    BORNHOLM_ACTIVITIES.forEach(function(a){
+      grid.appendChild(buildActivityCard(a, {mapMode: 'search'}));
+    });
+  }
+
+  var randomActiveFilter = 'all';
+  var randomActiveKidsFilter = 'all';
+  var wheelCandidates = [];
+  var wheelSpinning = false;
+  var WHEEL_PALETTE = ['#2f6f9e','#3b7a3f','#b5762a','#5c7a3f','#6b4f9e','#c1447a','#6b6357','#8f2e26','#7f4ab7','#2f6f5e'];
+
+  function renderRandomFilters(){
+    var el = document.getElementById('random-filters');
+    if(!el) return;
+    el.innerHTML = '';
+    var tags = ['all'];
+    ACTIVITIES.forEach(function(a){ if(tags.indexOf(a.tag) === -1) tags.push(a.tag); });
+    tags.forEach(function(t){
+      var btn = document.createElement('button');
+      btn.className = 'filter-chip' + (randomActiveFilter === t ? ' active' : '');
+      btn.textContent = t === 'all' ? 'Alla' : (TAG_LABELS[t] || t);
+      btn.addEventListener('click', function(){
+        randomActiveFilter = t;
+        renderRandomFilters();
+        renderWheel();
+      });
+      el.appendChild(btn);
+    });
+    var kidsEl = document.getElementById('random-kids-filters');
+    kidsEl.innerHTML = '';
+    var levels = ['all'];
+    ACTIVITIES.forEach(function(a){ if(a.kidsLevel && levels.indexOf(a.kidsLevel) === -1) levels.push(a.kidsLevel); });
+    levels.forEach(function(lv){
+      var btn = document.createElement('button');
+      btn.className = 'kids-chip' + (randomActiveKidsFilter === lv ? ' active' : '');
+      btn.textContent = lv === 'all' ? 'Alla barnvänlighetsnivåer' : (KIDS_LABELS[lv] || lv);
+      btn.addEventListener('click', function(){
+        randomActiveKidsFilter = lv;
+        renderRandomFilters();
+        renderWheel();
+      });
+      kidsEl.appendChild(btn);
+    });
+  }
+
+  function getWheelCandidates(){
+    return ACTIVITIES.filter(function(a){
+      return (randomActiveFilter === 'all' || a.tag === randomActiveFilter) &&
+             (randomActiveKidsFilter === 'all' || a.kidsLevel === randomActiveKidsFilter);
+    });
+  }
+
+  function renderWheel(){
+    var svg = document.getElementById('wheel-svg');
+    if(!svg) return;
+    var spinBtn = document.getElementById('wheel-spin-btn');
+    document.getElementById('wheel-result').innerHTML = '';
+    var candidates = getWheelCandidates();
+    wheelCandidates = candidates;
+    var existingMsg = document.getElementById('wheel-empty-msg');
+    if(existingMsg) existingMsg.remove();
+    if(candidates.length === 0){
+      svg.innerHTML = '';
+      spinBtn.disabled = true;
+      var msg = document.createElement('p');
+      msg.id = 'wheel-empty-msg';
+      msg.style.cssText = 'font-size:13px; color:var(--ink-soft); font-style:italic; margin-top:14px;';
+      msg.textContent = 'Inga aktiviteter matchar filtret just nu.';
+      svg.parentNode.insertAdjacentElement('afterend', msg);
+      return;
+    }
+    spinBtn.disabled = false;
+    var cx = 100, cy = 100, r = 96;
+    var n = candidates.length;
+    var slice = 360 / n;
+    var html = '';
+    if(n === 1){
+      html += '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + WHEEL_PALETTE[0] + '" stroke="#fdf6e6" stroke-width="1.5"/>';
+    } else {
+      candidates.forEach(function(a, i){
+        var startAngle = i * slice;
+        var endAngle = startAngle + slice;
+        var color = WHEEL_PALETTE[i % WHEEL_PALETTE.length];
+        var x1 = cx + r * Math.sin(startAngle * Math.PI / 180);
+        var y1 = cy - r * Math.cos(startAngle * Math.PI / 180);
+        var x2 = cx + r * Math.sin(endAngle * Math.PI / 180);
+        var y2 = cy - r * Math.cos(endAngle * Math.PI / 180);
+        var largeArc = slice > 180 ? 1 : 0;
+        html += '<path d="M' + cx + ',' + cy + ' L' + x1.toFixed(2) + ',' + y1.toFixed(2) + ' A' + r + ',' + r + ' 0 ' + largeArc + ' 1 ' + x2.toFixed(2) + ',' + y2.toFixed(2) + ' Z" fill="' + color + '" stroke="#fdf6e6" stroke-width="1"/>';
+      });
+    }
+    html += '<circle cx="' + cx + '" cy="' + cy + '" r="18" fill="#fdf6e6" stroke="#8f6039" stroke-width="2"/>';
+    svg.innerHTML = html;
+    svg.style.transition = 'none';
+    svg.style.transform = 'rotate(0deg)';
+    void svg.offsetWidth;
+  }
+
+  function spinWheel(){
+    if(wheelSpinning) return;
+    var candidates = wheelCandidates.length ? wheelCandidates : getWheelCandidates();
+    if(candidates.length === 0) return;
+    wheelSpinning = true;
+    var spinBtn = document.getElementById('wheel-spin-btn');
+    spinBtn.disabled = true;
+    document.getElementById('wheel-result').innerHTML = '';
+    var idx = Math.floor(Math.random() * candidates.length);
+    var choice = candidates[idx];
+    var n = candidates.length;
+    var slice = 360 / n;
+    var wedgeCenter = idx * slice + slice / 2;
+    var jitter = (Math.random() - 0.5) * slice * 0.6;
+    var spins = 5 + Math.floor(Math.random() * 3);
+    var targetRotation = spins * 360 + (360 - wedgeCenter + jitter);
+    var svg = document.getElementById('wheel-svg');
+    svg.style.transition = 'transform 4s cubic-bezier(0.12,0.67,0.1,1)';
+    svg.style.transform = 'rotate(' + targetRotation + 'deg)';
+    setTimeout(function(){
+      wheelSpinning = false;
+      spinBtn.disabled = false;
+      var resultEl = document.getElementById('wheel-result');
+      var heading = document.createElement('p');
+      heading.style.cssText = "font-weight:600; color:var(--ink); margin:0 0 10px; font-family:'Kalam',cursive; font-size:19px; text-align:center;";
+      heading.textContent = 'Ni ska åka till...';
+      resultEl.appendChild(heading);
+      var card = buildActivityCard(choice, {mapMode: 'directions'});
+      card.classList.add('open');
+      resultEl.appendChild(card);
+    }, 4150);
+  }
+
+  document.getElementById('wheel-spin-btn').addEventListener('click', spinWheel);
+
+  var DISH_NAMES = ['Mats','Carina','Rasmus','Robin','Emilia','Lisa','Andreas','Arvid','Vilmer','Iris'];
+  var dishSpinning = false;
+
+  function renderDishNames(){
+    var el = document.getElementById('dish-names');
+    if(!el || el.children.length) return;
+    DISH_NAMES.forEach(function(name){
+      var chip = document.createElement('div');
+      chip.className = 'dish-chip';
+      chip.textContent = name;
+      chip.dataset.name = name;
+      el.appendChild(chip);
+    });
+  }
+
+  function dishFacepalmSvg(){
+    return '<svg width="88" height="88" viewBox="0 0 64 64" class="dish-face">' +
+      '<g class="dish-head-wobble">' +
+        '<circle cx="32" cy="36" r="21" fill="#f2c675" stroke="#c98f2e" stroke-width="1.5"/>' +
+        '<g class="dish-eyes-normal">' +
+          '<path d="M21 32 Q24 28 27 32" stroke="#7a5a1e" stroke-width="2.2" fill="none" stroke-linecap="round"/>' +
+          '<path d="M37 32 Q40 28 43 32" stroke="#7a5a1e" stroke-width="2.2" fill="none" stroke-linecap="round"/>' +
+        '</g>' +
+        '<g class="dish-eyes-shock">' +
+          '<circle cx="24" cy="31" r="5.4" fill="#fff" stroke="#7a5a1e" stroke-width="1"/>' +
+          '<circle cx="40" cy="31" r="5.4" fill="#fff" stroke="#7a5a1e" stroke-width="1"/>' +
+          '<circle cx="25" cy="32" r="2.2" fill="#3a2a10"/>' +
+          '<circle cx="41" cy="32" r="2.2" fill="#3a2a10"/>' +
+        '</g>' +
+        '<ellipse class="dish-mouth-normal" cx="32" cy="46" rx="5.5" ry="7" fill="#7a5a1e" opacity="0.85"/>' +
+        '<ellipse class="dish-mouth-shock" cx="32" cy="48" rx="8.5" ry="5.5" fill="#7a5a1e"/>' +
+      '</g>' +
+      '<g class="dish-hand-group"><ellipse cx="29" cy="22" rx="15" ry="10.5" fill="#f2c675" stroke="#c98f2e" stroke-width="1.5" transform="rotate(-16 29 22)"/></g>' +
+      '<g class="dish-impact">' +
+        '<line x1="6" y1="10" x2="13" y2="15" stroke="#e8a93a" stroke-width="2.4" stroke-linecap="round"/>' +
+        '<line x1="2" y1="22" x2="11" y2="23" stroke="#e8a93a" stroke-width="2.4" stroke-linecap="round"/>' +
+        '<line x1="5" y1="34" x2="13" y2="30" stroke="#e8a93a" stroke-width="2.4" stroke-linecap="round"/>' +
+        '<line x1="52" y1="8" x2="47" y2="14" stroke="#e8a93a" stroke-width="2.4" stroke-linecap="round"/>' +
+        '<circle cx="58" cy="20" r="2.4" fill="#e8a93a"/>' +
+        '<circle cx="12" cy="6" r="1.8" fill="#e8a93a"/>' +
+      '</g>' +
+      '<ellipse class="dish-sweat" cx="47" cy="25" rx="2.6" ry="3.8" fill="#7fb8e8"/>' +
+      '</svg>';
+  }
+
+  function spinDish(){
+    if(dishSpinning) return;
+    var chips = document.querySelectorAll('#dish-names .dish-chip');
+    if(!chips.length) return;
+    dishSpinning = true;
+    var spinBtn = document.getElementById('dish-spin-btn');
+    spinBtn.disabled = true;
+    var resultEl = document.getElementById('dish-result');
+    resultEl.innerHTML = '<div class="dish-suspense">Vem tar disken...? 🤔</div>';
+    var n = chips.length;
+    var winner = Math.floor(Math.random() * n);
+    var cycles = 4;
+    var totalSteps = cycles * n + winner + 1;
+    var step = 0;
+    var delay = 50;
+    function tick(){
+      chips.forEach(function(c){ c.classList.remove('active'); });
+      chips[step % n].classList.add('active');
+      step++;
+      if(step < totalSteps){
+        delay = Math.min(delay * 1.09, 200);
+        setTimeout(tick, delay);
+      } else {
+        dishSpinning = false;
+        spinBtn.disabled = false;
+        var name = chips[winner].dataset.name;
+        resultEl.innerHTML = '<div class="dish-suspense-final">Vem tar disken?</div>' + dishFacepalmSvg() + '<div>🍽️ <b>' + name + '</b> tar disken idag!</div>';
+      }
+    }
+    tick();
+  }
+
+  document.getElementById('dish-spin-btn').addEventListener('click', spinDish);
+
+  function renderStarRating(container, activityName){
+    container.innerHTML = '';
+    var rating = (state.ratings && state.ratings[activityName]) || {sum:0, count:0};
+    var avg = rating.count ? (rating.sum / rating.count) : 0;
+    for(var n = 1; n <= 5; n++){
+      var btn = document.createElement('button');
+      btn.textContent = '★';
+      btn.setAttribute('aria-label', 'Betygsätt ' + n + ' av 5');
+      if(n <= Math.round(avg)) btn.classList.add('filled');
+      (function(val){
+        btn.addEventListener('click', function(e){
+          e.stopPropagation();
+          state.ratings = state.ratings || {};
+          state.ratings[activityName] = state.ratings[activityName] || {sum:0, count:0};
+          state.ratings[activityName].sum += val;
+          state.ratings[activityName].count += 1;
+          saveState();
+          renderStarRating(container, activityName);
+          renderToplist();
+        });
+      })(n);
+      container.appendChild(btn);
+    }
+    var label = document.createElement('span');
+    label.className = 'star-avg';
+    label.textContent = rating.count ? ('Snitt ' + avg.toFixed(1) + ' (' + rating.count + ' röster)') : 'Klicka en stjärna för att rösta';
+    container.appendChild(label);
+  }
+
+  function renderToplist(){
+    var container = document.getElementById('toplist-container');
+    if(!container) return;
+    container.innerHTML = '';
+    var rated = ACTIVITIES.map(function(a){
+      var r = (state.ratings && state.ratings[a.name]) || {sum:0, count:0};
+      return { name: a.name, tagLabel: a.tagLabel, avg: r.count ? (r.sum / r.count) : 0, count: r.count };
+    });
+    rated.sort(function(x, y){
+      if(y.count === 0 && x.count === 0) return 0;
+      if(x.count === 0) return 1;
+      if(y.count === 0) return -1;
+      return y.avg - x.avg;
+    });
+    rated.forEach(function(item, idx){
+      var row = document.createElement('div');
+      row.className = 'top-row';
+      row.innerHTML =
+        '<span class="top-rank">' + (idx + 1) + '</span>' +
+        '<span class="top-name">' + item.name + '<div class="top-badge">' + item.tagLabel + '</div></span>' +
+        '<span class="top-score">' + (item.count ? (item.avg.toFixed(1) + ' ★ (' + item.count + ')') : 'Ej betygsatt') + '</span>';
+      container.appendChild(row);
+    });
+  }
+
+  var BUCKET_ID = null;
+  var BUCKET_PARAM = "b";
+
+  var BUCKET_STORAGE_KEY = 'osterlen_bucket';
+
+  async function ensureBucket(){
+    var params = new URLSearchParams(window.location.search);
+    var existing = params.get(BUCKET_PARAM);
+    if(existing){
+      BUCKET_ID = existing;
+      try{ localStorage.setItem(BUCKET_STORAGE_KEY, existing); }catch(e){}
+      return true;
+    }
+    var remembered = null;
+    try{ remembered = localStorage.getItem(BUCKET_STORAGE_KEY); }catch(e){}
+    if(remembered){
+      BUCKET_ID = remembered;
+      params.set(BUCKET_PARAM, remembered);
+      window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
+      return true;
+    }
+    try{
+      var initial = { schedule: defaultSchedule(), votes: {}, ratings: {}, shopping: [], checkins: {}, seeded: true };
+      var res = await fetch('https://jsonblob.com/api/jsonBlob', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(initial)
+      });
+      var loc = res.headers.get('Location') || res.headers.get('location');
+      var id = loc ? loc.split('/').filter(Boolean).pop() : null;
+      if(!id){
+        // Vissa webbläsare exponerar inte Location-headern - fall tillbaka på en egen slumpad kod
+        id = 'local-' + Math.random().toString(36).slice(2, 10);
+      }
+      BUCKET_ID = id;
+      try{ localStorage.setItem(BUCKET_STORAGE_KEY, id); }catch(e){}
+      params.set(BUCKET_PARAM, id);
+      window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
+      showBucketBanner();
+      return true;
+    }catch(e){
+      return false;
+    }
+  }
+
+  function showBucketBanner(){
+    var banner = document.createElement('div');
+    banner.style.cssText = 'position:fixed; left:12px; right:12px; bottom:12px; z-index:9999; background:#2f6f5e; color:#fdf6e6; padding:14px 16px; border-radius:10px; font-size:13px; box-shadow:0 6px 20px rgba(0,0,0,0.35); max-width:480px; margin:0 auto;';
+    banner.innerHTML = 'Länken är nu unik för er grupp. Kopiera adressen i adressfältet och skicka <b>den</b> länken till resten av familjen, så ser alla samma information. <button id="banner-close" style="margin-left:10px; background:rgba(255,255,255,0.2); border:none; color:#fdf6e6; padding:4px 10px; border-radius:5px; cursor:pointer;">OK</button>';
+    document.body.appendChild(banner);
+    document.getElementById('banner-close').addEventListener('click', function(){ banner.remove(); });
+  }
+
+  async function remoteGet(){
+    if(!BUCKET_ID || BUCKET_ID.indexOf('local-') === 0) return null;
+    try{
+      var res = await fetch('https://jsonblob.com/api/jsonBlob/' + BUCKET_ID, { headers: { 'Accept': 'application/json' } });
+      if(!res.ok) return null;
+      return await res.text();
+    }catch(e){
+      return null;
+    }
+  }
+
+  async function remoteSet(value){
+    if(!BUCKET_ID || BUCKET_ID.indexOf('local-') === 0) return;
+    try{
+      await fetch('https://jsonblob.com/api/jsonBlob/' + BUCKET_ID, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: value
+      });
+    }catch(e){
+      console.error('Kunde inte spara delat', e);
+    }
+  }
+
+  function showGroupCodeIndicator(){
+    if(!BUCKET_ID || document.getElementById('group-code-indicator')) return;
+    var tag = document.createElement('div');
+    tag.id = 'group-code-indicator';
+    tag.style.cssText = 'position:fixed; right:8px; bottom:8px; z-index:9998; background:rgba(0,0,0,0.35); color:rgba(253,246,230,0.85); font-size:10px; font-family:monospace; padding:3px 7px; border-radius:10px; pointer-events:none;';
+    tag.textContent = 'Grupp: …' + BUCKET_ID.slice(-6);
+    document.body.appendChild(tag);
+  }
+
+  async function loadState(){
+    var ok = await ensureBucket();
+    showGroupCodeIndicator();
+    if(ok){
+      var text = await remoteGet();
+      if(text){
+        try{
+          state = JSON.parse(text);
+          state.schedule = state.schedule || defaultSchedule();
+          state.votes = state.votes || {};
+          state.ratings = state.ratings || {};
+          state.shopping = state.shopping || [];
+          state.checkins = state.checkins || {};
+          render();
+          return;
+        }catch(e){}
+      }
+    }
+    state = { schedule: defaultSchedule(), votes: {}, ratings: {}, shopping: [], checkins: {}, seeded: true };
+    render();
+  }
+
+  async function saveState(){
+    await remoteSet(JSON.stringify(state));
+  }
+
+  function render(){
+    initMap();
+    loadWeather();
+    renderActivities();
+    renderBornholmActivities();
+    renderSchedule();
+    renderShopping();
+    renderToplist();
+    renderWhereis();
+  }
+
+  function renderSchedule(){
+    var ul = document.getElementById('schedule-list');
+    ul.innerHTML = '';
+    if(state.schedule.length === 0){
+      ul.innerHTML = '<li class="empty-hint">Inget inplanerat ännu</li>';
+      return;
+    }
+    var sorted = state.schedule.slice().sort(function(a,b){ return (a.date||'').localeCompare(b.date||''); });
+    sorted.forEach(function(s){
+      var li = document.createElement('li');
+      li.className = 'item';
+      li.innerHTML = '<span class="txt"></span><input type="date" class="sched-date-input" aria-label="Välj dag"><button class="del" aria-label="Ta bort">✕</button>';
+      li.querySelector('.txt').textContent = s.text;
+      var dateInput = li.querySelector('.sched-date-input');
+      dateInput.value = s.date || '';
+      dateInput.addEventListener('change', function(){
+        s.date = dateInput.value;
+        saveState(); renderSchedule();
+      });
+      li.querySelector('.del').addEventListener('click', function(){
+        state.schedule = state.schedule.filter(function(x){return x.id !== s.id;});
+        saveState(); renderSchedule();
+      });
+      ul.appendChild(li);
+    });
+  }
+
+  var SHOP_CATEGORIES = [
+    { name: "Frukt & grönt", keywords: ["äpple","äpplen","banan","bananer","apelsin","tomat","gurka","sallad","potatis","lök","morot","morötter","paprika","citron","avokado","blåbär","jordgubbar","vindruvor","svamp","broccoli","vitlök","päron","melon","ärtor","spenat"] },
+    { name: "Bröd & bageri", keywords: ["bröd","bulle","bullar","fralla","frallor","knäckebröd","kaka","kex","tortilla"] },
+    { name: "Mejeri & ägg", keywords: ["mjölk","grädde","yoghurt","fil","ost","smör","ägg","keso","crème fraiche","margarin"] },
+    { name: "Kött & fisk", keywords: ["kyckling","korv","fläskfilé","nötfärs","köttfärs","lax","räkor","bacon","skinka","fisk","kotlett","biff"] },
+    { name: "Skafferi", keywords: ["pasta","ris","mjöl","socker","olja","konserv","müsli","flingor","salt","peppar","krydda","buljong","honung","sylt","nötter"] },
+    { name: "Fryst", keywords: ["glass","fryst","frysta","pizza"] },
+    { name: "Dryck", keywords: ["läsk","juice","vatten","öl","vin","kaffe","te","saft","cider"] },
+    { name: "Barn", keywords: ["blöjor","blöja","välling","barnmat","napp","våtservetter"] },
+    { name: "Övrigt", keywords: [] }
+  ];
+
+  function categorize(item){
+    var lower = item.toLowerCase();
+    for(var i = 0; i < SHOP_CATEGORIES.length - 1; i++){
+      var cat = SHOP_CATEGORIES[i];
+      for(var j = 0; j < cat.keywords.length; j++){
+        if(lower.indexOf(cat.keywords[j]) !== -1) return cat.name;
+      }
+    }
+    return "Övrigt";
+  }
+
+  function renderShopping(){
+    var container = document.getElementById('shopping-groups');
+    container.innerHTML = '';
+    if(state.shopping.length === 0){
+      container.innerHTML = '<p class="empty-hint">Inköpslistan är tom ännu</p>';
+      return;
+    }
+    SHOP_CATEGORIES.forEach(function(cat){
+      var items = state.shopping.filter(function(s){ return s.category === cat.name; });
+      if(items.length === 0) return;
+      var group = document.createElement('div');
+      group.className = 'shop-group';
+      var title = document.createElement('div');
+      title.className = 'shop-group-title';
+      title.textContent = cat.name;
+      group.appendChild(title);
+      items.forEach(function(s){
+        var row = document.createElement('div');
+        row.className = 'shop-item' + (s.done ? ' done' : '');
+        row.innerHTML = '<input type="checkbox" ' + (s.done ? 'checked' : '') + '><span class="txt"></span><button class="del" aria-label="Ta bort">✕</button>';
+        row.querySelector('.txt').textContent = s.text;
+        row.querySelector('input').addEventListener('change', function(){
+          s.done = !s.done; saveState(); renderShopping();
+        });
+        row.querySelector('.del').addEventListener('click', function(){
+          state.shopping = state.shopping.filter(function(x){ return x.id !== s.id; });
+          saveState(); renderShopping();
+        });
+        group.appendChild(row);
+      });
+      container.appendChild(group);
+    });
+  }
+
+  function timeAgoLabel(iso){
+    var then = new Date(iso);
+    var diffMin = Math.round((Date.now() - then.getTime()) / 60000);
+    if(diffMin < 1) return "just nu";
+    if(diffMin < 60) return "för " + diffMin + " min sedan";
+    var diffH = Math.round(diffMin / 60);
+    if(diffH < 24) return "för " + diffH + " tim sedan";
+    return then.toLocaleDateString('sv-SE', {day:'numeric', month:'short'}) + ' kl ' + then.toLocaleTimeString('sv-SE', {hour:'2-digit', minute:'2-digit'});
+  }
+
+  function renderWhereis(){
+    var list = document.getElementById('whereis-list');
+    if(!list) return;
+    var names = Object.keys(state.checkins || {});
+    if(names.length === 0){
+      list.innerHTML = '<p class="empty-hint">Ingen har uppdaterat sin status ännu</p>';
+    } else {
+      names.sort(function(a, b){
+        return new Date(state.checkins[b].time) - new Date(state.checkins[a].time);
+      });
+      list.innerHTML = '';
+      names.forEach(function(name){
+        var entry = state.checkins[name];
+        var card = document.createElement('div');
+        card.className = 'whereis-card';
+        var initials = name.trim().slice(0, 2).toUpperCase();
+        card.innerHTML =
+          '<div class="whereis-avatar"></div>' +
+          '<div style="flex:1;">' +
+            '<div class="whereis-name"></div>' +
+            '<div class="whereis-status"></div>' +
+            '<div class="whereis-time"></div>' +
+          '</div>' +
+          '<button class="whereis-del" aria-label="Ta bort status">✕</button>';
+        card.querySelector('.whereis-avatar').textContent = initials;
+        card.querySelector('.whereis-name').textContent = name;
+        card.querySelector('.whereis-status').textContent = entry.status + (entry.until ? ' (till kl ' + entry.until + ')' : '') + (typeof entry.lat === 'number' ? ' (GPS)' : '');
+        card.querySelector('.whereis-time').textContent = 'Uppdaterad ' + timeAgoLabel(entry.time);
+        card.querySelector('.whereis-del').addEventListener('click', function(){
+          delete state.checkins[name];
+          saveState(); renderWhereis();
+        });
+        list.appendChild(card);
+      });
+    }
+    var placeList = document.getElementById('whereis-places');
+    if(placeList && placeList.children.length === 0){
+      var homeOpt = document.createElement('option');
+      homeOpt.value = 'Skillinge (hemma)';
+      placeList.appendChild(homeOpt);
+      ACTIVITIES.forEach(function(a){
+        var opt = document.createElement('option');
+        opt.value = a.name;
+        placeList.appendChild(opt);
+      });
+    }
+    renderCheckinPins();
+    renderWhereisMapPins();
+  }
+
+  document.getElementById('sched-add').addEventListener('click', function(){
+    var d = document.getElementById('sched-date');
+    var t = document.getElementById('sched-input');
+    if(!t.value.trim()) return;
+    state.schedule.push({id: uid(), date: d.value, text: t.value.trim()});
+    d.value = ''; t.value = '';
+    saveState(); renderSchedule();
+  });
+  document.getElementById('sched-input').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') document.getElementById('sched-add').click();
+  });
+
+  document.getElementById('shopping-add').addEventListener('click', function(){
+    var inp = document.getElementById('shopping-input');
+    var raw = inp.value.trim();
+    if(!raw) return;
+    raw.split(/[,\n]/).forEach(function(part){
+      var text = part.trim();
+      if(!text) return;
+      state.shopping.push({id: uid(), text: text, category: categorize(text), done: false});
+    });
+    inp.value = '';
+    saveState(); renderShopping();
+  });
+  document.getElementById('shopping-input').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') document.getElementById('shopping-add').click();
+  });
+
+  function shoppingToText(){
+    var lines = [];
+    SHOP_CATEGORIES.forEach(function(cat){
+      var items = state.shopping.filter(function(s){ return s.category === cat.name; });
+      if(items.length === 0) return;
+      lines.push('== ' + cat.name + ' ==');
+      items.forEach(function(s){
+        lines.push('[' + (s.done ? 'x' : ' ') + '] ' + s.text);
+      });
+    });
+    return lines.join('\n');
+  }
+
+  document.getElementById('shopping-share').addEventListener('click', function(){
+    var text = shoppingToText();
+    var box = document.getElementById('shopping-share-text');
+    var msg = document.getElementById('shopping-share-msg');
+    if(!text){
+      msg.textContent = 'Listan är tom, lägg till något först.';
+      box.style.display = 'none';
+      return;
+    }
+    box.value = text;
+    box.style.display = 'block';
+    box.focus();
+    box.select();
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){
+        msg.textContent = 'Kopierat! Klistra in i SMS/WhatsApp och skicka till familjen.';
+      }).catch(function(){
+        msg.textContent = 'Texten är markerad ovan – kopiera den manuellt (Ctrl/Cmd+C) och skicka.';
+      });
+    } else {
+      msg.textContent = 'Texten är markerad ovan – kopiera den manuellt och skicka.';
+    }
+  });
+
+  document.getElementById('shopping-import-btn').addEventListener('click', function(){
+    var raw = document.getElementById('shopping-import-text').value;
+    var msg = document.getElementById('shopping-import-msg');
+    if(!raw.trim()){
+      msg.textContent = 'Klistra in text först.';
+      return;
+    }
+    var added = 0, updated = 0;
+    raw.split('\n').forEach(function(line){
+      var m = line.match(/^\[( |x|X)\]\s*(.+)/);
+      if(!m) return;
+      var done = (m[1].toLowerCase() === 'x');
+      var text = m[2].trim();
+      if(!text) return;
+      var existing = state.shopping.filter(function(s){ return s.text.toLowerCase() === text.toLowerCase(); })[0];
+      if(existing){
+        existing.done = done;
+        updated++;
+      } else {
+        state.shopping.push({id: uid(), text: text, category: categorize(text), done: done});
+        added++;
+      }
+    });
+    if(added === 0 && updated === 0){
+      msg.textContent = 'Hittade inget att importera. Klistra in text som sidan själv skapat via "Dela lista".';
+    } else {
+      msg.textContent = added + ' nya varor tillagda, ' + updated + ' uppdaterade.';
+      document.getElementById('shopping-import-text').value = '';
+    }
+    saveState(); renderShopping();
+  });
+
+  document.getElementById('whereis-add').addEventListener('click', function(){
+    var nameInput = document.getElementById('whereis-name');
+    var statusInput = document.getElementById('whereis-status');
+    var untilInput = document.getElementById('whereis-until');
+    var name = nameInput.value.trim();
+    var status = statusInput.value.trim();
+    if(!name || !status) return;
+    state.checkins = state.checkins || {};
+    state.checkins[name] = { status: status, until: untilInput.value || '', time: new Date().toISOString() };
+    statusInput.value = '';
+    untilInput.value = '';
+    saveState(); renderWhereis();
+  });
+
+  document.getElementById('whereis-gps').addEventListener('click', function(){
+    var nameInput = document.getElementById('whereis-name');
+    var statusInput = document.getElementById('whereis-status');
+    var untilInput = document.getElementById('whereis-until');
+    var msg = document.getElementById('whereis-gps-msg');
+    var gpsBtn = document.getElementById('whereis-gps');
+    var name = nameInput.value.trim();
+    if(!name){
+      msg.textContent = 'Skriv ditt namn först.';
+      return;
+    }
+    if(!navigator.geolocation){
+      msg.textContent = 'Din webbläsare stödjer tyvärr inte platsdelning.';
+      return;
+    }
+    gpsBtn.disabled = true;
+    msg.textContent = 'Hämtar din plats...';
+    navigator.geolocation.getCurrentPosition(function(pos){
+      state.checkins = state.checkins || {};
+      state.checkins[name] = {
+        status: statusInput.value.trim() || 'Delade sin plats',
+        until: untilInput.value || '',
+        time: new Date().toISOString(),
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude
+      };
+      statusInput.value = '';
+      untilInput.value = '';
+      msg.textContent = 'Klart, din plats är utlagd på kartan i Översikt.';
+      gpsBtn.disabled = false;
+      saveState(); renderWhereis();
+    }, function(err){
+      gpsBtn.disabled = false;
+      if(err.code === err.PERMISSION_DENIED){
+        msg.textContent = 'Platsdelning nekades. Tillåt platsåtkomst i webbläsaren och försök igen.';
+      } else {
+        msg.textContent = 'Kunde inte hämta din plats just nu, försök igen.';
+      }
+    }, { enableHighAccuracy: true, timeout: 10000 });
+  });
+  document.getElementById('whereis-status').addEventListener('keydown', function(e){
+    if(e.key === 'Enter') document.getElementById('whereis-add').click();
+  });
+
+})();
+</script>
+<script>
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', function(){
+      navigator.serviceWorker.register('sw.js').catch(function(){});
+    });
+  }
+
+  (function(){
+    var isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+    var link = document.getElementById('install-link');
+    if(isStandalone){
+      if(link) link.style.display = 'none';
+      return;
+    }
+    var deferredPrompt = null;
+    var isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    window.addEventListener('beforeinstallprompt', function(e){
+      e.preventDefault();
+      deferredPrompt = e;
+    });
+    if(link){
+      link.addEventListener('click', function(){
+        if(deferredPrompt){
+          deferredPrompt.prompt();
+          deferredPrompt.userChoice.then(function(){ deferredPrompt = null; });
+          return;
+        }
+        var hint = document.getElementById('install-hint');
+        if(!hint) return;
+        hint.textContent = isIOS
+          ? 'iPhone: tryck på Dela-ikonen nedtill i Safari → "Lägg till på hemskärmen".'
+          : 'Android: meny (⋮) uppe till höger i Chrome → "Installera app" eller "Lägg till på startskärmen".';
+        hint.style.display = hint.style.display === 'none' ? 'block' : 'none';
+      });
+    }
+    window.addEventListener('appinstalled', function(){
+      if(link) link.style.display = 'none';
+    });
+  })();
+</script>
+</body>
+</html>

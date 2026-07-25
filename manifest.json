@@ -1,0 +1,12 @@
+{
+  "name": "En vecka i Österlen",
+  "short_name": "Österlen",
+  "description": "Delad planeringssida för familjens Österlen-resa",
+  "display": "standalone",
+  "start_url": "./osterlen.html",
+  "background_color": "#a9754a",
+  "theme_color": "#a9754a",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
