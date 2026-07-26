@@ -2348,55 +2348,91 @@
 
   var BUCKET_ID = null;
   var BUCKET_PARAM = "b";
-
   var BUCKET_STORAGE_KEY = 'osterlen_bucket';
+  var saveFailCount = 0;
+
+  async function bucketExists(id){
+    try{
+      var res = await fetch('https://jsonblob.com/api/jsonBlob/' + id, { headers: { 'Accept': 'application/json' } });
+      return res.ok;
+    }catch(e){
+      return false;
+    }
+  }
+
+  async function createNewBucket(){
+    var initial = { schedule: defaultSchedule(), votes: {}, ratings: {}, shopping: [], checkins: {}, seeded: true };
+    var res = await fetch('https://jsonblob.com/api/jsonBlob', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(initial)
+    });
+    var loc = res.headers.get('Location') || res.headers.get('location');
+    var id = loc ? loc.split('/').filter(Boolean).pop() : null;
+    if(!id){
+      // Vissa webbläsare exponerar inte Location-headern - fall tillbaka på en egen slumpad kod
+      id = 'local-' + Math.random().toString(36).slice(2, 10);
+    }
+    return id;
+  }
+
+  function setBucketInUrl(id){
+    var params = new URLSearchParams(window.location.search);
+    params.set(BUCKET_PARAM, id);
+    window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
+  }
 
   async function ensureBucket(){
     var params = new URLSearchParams(window.location.search);
-    var existing = params.get(BUCKET_PARAM);
-    if(existing){
-      BUCKET_ID = existing;
-      try{ localStorage.setItem(BUCKET_STORAGE_KEY, existing); }catch(e){}
-      return true;
+    var candidate = params.get(BUCKET_PARAM);
+    var candidateFromUrl = !!candidate;
+    if(!candidate){
+      try{ candidate = localStorage.getItem(BUCKET_STORAGE_KEY); }catch(e){}
     }
-    var remembered = null;
-    try{ remembered = localStorage.getItem(BUCKET_STORAGE_KEY); }catch(e){}
-    if(remembered){
-      BUCKET_ID = remembered;
-      params.set(BUCKET_PARAM, remembered);
-      window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
-      return true;
-    }
-    try{
-      var initial = { schedule: defaultSchedule(), votes: {}, ratings: {}, shopping: [], checkins: {}, seeded: true };
-      var res = await fetch('https://jsonblob.com/api/jsonBlob', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(initial)
-      });
-      var loc = res.headers.get('Location') || res.headers.get('location');
-      var id = loc ? loc.split('/').filter(Boolean).pop() : null;
-      if(!id){
-        // Vissa webbläsare exponerar inte Location-headern - fall tillbaka på en egen slumpad kod
-        id = 'local-' + Math.random().toString(36).slice(2, 10);
+    if(candidate && candidate.indexOf('local-') !== 0){
+      var ok = await bucketExists(candidate);
+      if(ok){
+        BUCKET_ID = candidate;
+        try{ localStorage.setItem(BUCKET_STORAGE_KEY, candidate); }catch(e){}
+        if(!candidateFromUrl) setBucketInUrl(candidate);
+        return true;
       }
+    } else if(candidate){
+      BUCKET_ID = candidate;
+      return true;
+    }
+    var hadOldLink = !!candidate;
+    try{
+      var id = await createNewBucket();
       BUCKET_ID = id;
       try{ localStorage.setItem(BUCKET_STORAGE_KEY, id); }catch(e){}
-      params.set(BUCKET_PARAM, id);
-      window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
-      showBucketBanner();
+      setBucketInUrl(id);
+      showBucketBanner(hadOldLink);
       return true;
     }catch(e){
       return false;
     }
   }
 
-  function showBucketBanner(){
+  function showBucketBanner(wasExpired){
     var banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed; left:12px; right:12px; bottom:12px; z-index:9999; background:#2f6f5e; color:#fdf6e6; padding:14px 16px; border-radius:10px; font-size:13px; box-shadow:0 6px 20px rgba(0,0,0,0.35); max-width:480px; margin:0 auto;';
-    banner.innerHTML = 'Länken är nu unik för er grupp. Kopiera adressen i adressfältet och skicka <b>den</b> länken till resten av familjen, så ser alla samma information. <button id="banner-close" style="margin-left:10px; background:rgba(255,255,255,0.2); border:none; color:#fdf6e6; padding:4px 10px; border-radius:5px; cursor:pointer;">OK</button>';
+    banner.style.cssText = 'position:fixed; left:12px; right:12px; bottom:12px; z-index:9999; background:' + (wasExpired ? '#8f2e26' : '#2f6f5e') + '; color:#fdf6e6; padding:14px 16px; border-radius:10px; font-size:13px; box-shadow:0 6px 20px rgba(0,0,0,0.35); max-width:480px; margin:0 auto;';
+    var msg = wasExpired
+      ? 'Den gamla delade listan gick inte att hitta längre (togs bort hos lagringstjänsten) och tidigare data kunde tyvärr inte återställas. En <b>ny</b> delad lista har skapats.'
+      : 'Länken är nu unik för er grupp.';
+    banner.innerHTML = msg + ' Kopiera adressen i adressfältet och skicka <b>den</b> länken till resten av familjen, så ser alla samma information. <button id="banner-close" style="margin-left:10px; background:rgba(255,255,255,0.2); border:none; color:#fdf6e6; padding:4px 10px; border-radius:5px; cursor:pointer;">OK</button>';
     document.body.appendChild(banner);
     document.getElementById('banner-close').addEventListener('click', function(){ banner.remove(); });
+  }
+
+  function showSaveErrorBanner(){
+    if(document.getElementById('save-error-banner')) return;
+    var banner = document.createElement('div');
+    banner.id = 'save-error-banner';
+    banner.style.cssText = 'position:fixed; left:12px; right:12px; bottom:12px; z-index:9999; background:#8f2e26; color:#fdf6e6; padding:14px 16px; border-radius:10px; font-size:13px; box-shadow:0 6px 20px rgba(0,0,0,0.35); max-width:480px; margin:0 auto;';
+    banner.innerHTML = 'Kunde inte spara din ändring till den delade listan (nätverksproblem eller så är den delade lagringen borta). Kontrollera internetanslutningen och prova igen. <button id="save-error-close" style="margin-left:10px; background:rgba(255,255,255,0.2); border:none; color:#fdf6e6; padding:4px 10px; border-radius:5px; cursor:pointer;">OK</button>';
+    document.body.appendChild(banner);
+    document.getElementById('save-error-close').addEventListener('click', function(){ banner.remove(); });
   }
 
   async function remoteGet(){
@@ -2413,13 +2449,22 @@
   async function remoteSet(value){
     if(!BUCKET_ID || BUCKET_ID.indexOf('local-') === 0) return;
     try{
-      await fetch('https://jsonblob.com/api/jsonBlob/' + BUCKET_ID, {
+      var res = await fetch('https://jsonblob.com/api/jsonBlob/' + BUCKET_ID, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: value
       });
+      if(!res.ok){
+        saveFailCount++;
+        console.error('Kunde inte spara delat, status', res.status);
+        showSaveErrorBanner();
+        return;
+      }
+      saveFailCount = 0;
     }catch(e){
+      saveFailCount++;
       console.error('Kunde inte spara delat', e);
+      showSaveErrorBanner();
     }
   }
 
