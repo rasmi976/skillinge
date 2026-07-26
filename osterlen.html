@@ -590,14 +590,13 @@
     <p class="map-note">Förenklad, egenritad karta (inte skalenlig) – klicka på "Vägbeskrivning" i ett kort för exakt vägbeskrivning i Google Maps.</p>
     <div class="legend">
       <span><i style="background:#2f6f9e"></i>Bad</span>
-      <span><i style="background:#3b7a3f"></i>Natur</span>
-      <span><i style="background:#b5762a"></i>Restaurang/fik</span>
-      <span><i style="background:#c98a1f"></i>Mataffär</span>
-      <span><i style="background:#6b4f9e"></i>Historia</span>
-      <span><i style="background:#c1447a"></i>Lekplats/gård</span>
-      <span><i style="background:#6b6357"></i>Regnig dag</span>
-      <span><i style="background:#8f2e26"></i>Aktivt</span>
-      <span><i style="background:#7f4ab7"></i>Person incheckad</span>
+      <span><i style="background:#3b7a3f; border-radius:3px;"></i>Natur</span>
+      <span><i style="background:#b5762a; border-radius:2px; transform:rotate(45deg);"></i>Restaurang/fik</span>
+      <span><i style="background:#c98a1f; border-radius:0; clip-path:polygon(50% 0%,0% 100%,100% 100%);"></i>Mataffär</span>
+      <span><i style="background:#6b4f9e; border-radius:0; clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%);"></i>Historia</span>
+      <span><i style="background:#c1447a; border-radius:0; clip-path:polygon(35% 0%,65% 0%,65% 35%,100% 35%,100% 65%,65% 65%,65% 100%,35% 100%,35% 65%,0% 65%,0% 35%,35% 35%);"></i>Lekplats/gård</span>
+      <span><i style="background:radial-gradient(circle, #fdf6e6 32%, #6b6357 33%);"></i>Regnig dag</span>
+      <span><i style="background:#8f2e26; border-radius:0; clip-path:polygon(50% 0%,100% 38%,82% 100%,18% 100%,0% 38%);"></i>Aktivt</span>
     </div>
 
     <div class="layout">
@@ -1648,9 +1647,9 @@
     nature:  {r:'4px'},
     food:    {r:'3px', rot:45},
     grocery: {clip:'50% 0%,0% 100%,100% 100%'},
-    history: {clip:'25% 6%,75% 6%,100% 50%,75% 94%,25% 94%,0% 50%'},
+    history: {clip:'50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%'},
     play:    {clip:'35% 0%,65% 0%,65% 35%,100% 35%,100% 65%,65% 65%,65% 100%,35% 100%,35% 65%,0% 65%,0% 35%,35% 35%'},
-    active:  {clip:'30% 0%,70% 0%,100% 30%,100% 70%,70% 100%,30% 100%,0% 70%,0% 30%'}
+    active:  {clip:'50% 0%,100% 38%,82% 100%,18% 100%,0% 38%'}
   };
   function shapeLayerCss(size, color, cfg){
     var shape = cfg.clip ? ('clip-path:polygon(' + cfg.clip + ');') : ('border-radius:' + (cfg.r || '50%') + ';');
@@ -1661,16 +1660,16 @@
   function tagPinHtml(tag, color){
     var ink = '#2e2418';
     if(tag === 'rain'){
-      return '<div style="position:relative;width:20px;height:20px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.45));">' +
-        '<div style="' + shapeLayerCss(20, ink, {r:'50%'}) + '"></div>' +
-        '<div style="' + shapeLayerCss(15, color, {r:'50%'}) + '"></div>' +
-        '<div style="' + shapeLayerCss(7, '#fdf6e6', {r:'50%'}) + '"></div>' +
+      return '<div style="position:relative;width:17px;height:17px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.45));">' +
+        '<div style="' + shapeLayerCss(17, ink, {r:'50%'}) + '"></div>' +
+        '<div style="' + shapeLayerCss(12, color, {r:'50%'}) + '"></div>' +
+        '<div style="' + shapeLayerCss(6, '#fdf6e6', {r:'50%'}) + '"></div>' +
         '</div>';
     }
     var cfg = TAG_SHAPES[tag] || {r:'50%'};
-    return '<div style="position:relative;width:20px;height:20px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.45));">' +
-      '<div style="' + shapeLayerCss(20, ink, cfg) + '"></div>' +
-      '<div style="' + shapeLayerCss(15, color, cfg) + '"></div>' +
+    return '<div style="position:relative;width:17px;height:17px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.45));">' +
+      '<div style="' + shapeLayerCss(17, ink, cfg) + '"></div>' +
+      '<div style="' + shapeLayerCss(12, color, cfg) + '"></div>' +
       '</div>';
   }
 
@@ -1877,7 +1876,7 @@
       var color = TAG_COLORS[a.tag] || '#8f6039';
       var icon = L.divIcon({
         html: tagPinHtml(a.tag, color),
-        className: '', iconSize:[20,20], iconAnchor:[10,10]
+        className: '', iconSize:[17,17], iconAnchor:[8,8]
       });
       var slug = slugify(a.name);
       var dirUrl = 'https://www.google.com/maps/dir/?api=1&origin=' + HOME.lat + ',' + HOME.lng + '&destination=' + a.lat + ',' + a.lng + '&destination_place_id=' + a.placeId;
