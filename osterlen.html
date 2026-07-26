@@ -361,7 +361,7 @@
   .badge.water{background:#2f6f9e;}
   .badge.nature{background:#3b7a3f;}
   .badge.food{background:#b5762a;}
-  .badge.grocery{background:#5c7a3f;}
+  .badge.grocery{background:#c98a1f;}
   .badge.history{background:#6b4f9e;}
   .badge.play{background:#c1447a;}
   .badge.rain{background:#6b6357;}
@@ -592,7 +592,7 @@
       <span><i style="background:#2f6f9e"></i>Bad</span>
       <span><i style="background:#3b7a3f"></i>Natur</span>
       <span><i style="background:#b5762a"></i>Restaurang/fik</span>
-      <span><i style="background:#5c7a3f"></i>Mataffär</span>
+      <span><i style="background:#c98a1f"></i>Mataffär</span>
       <span><i style="background:#6b4f9e"></i>Historia</span>
       <span><i style="background:#c1447a"></i>Lekplats/gård</span>
       <span><i style="background:#6b6357"></i>Regnig dag</span>
@@ -1642,7 +1642,37 @@
 
   var MAP_BOUNDS = { minLat: 55.35, maxLat: 55.77, minLng: 13.75, maxLng: 14.38 };
   var MAP_W = 800, MAP_H = 380;
-  var TAG_COLORS = {water:'#2f6f9e', nature:'#3b7a3f', food:'#b5762a', grocery:'#5c7a3f', history:'#6b4f9e', play:'#c1447a', rain:'#6b6357', active:'#8f2e26'};
+  var TAG_COLORS = {water:'#2f6f9e', nature:'#3b7a3f', food:'#b5762a', grocery:'#c98a1f', history:'#6b4f9e', play:'#c1447a', rain:'#6b6357', active:'#8f2e26'};
+  var TAG_SHAPES = {
+    water:   {r:'50%'},
+    nature:  {r:'4px'},
+    food:    {r:'3px', rot:45},
+    grocery: {clip:'50% 0%,0% 100%,100% 100%'},
+    history: {clip:'25% 6%,75% 6%,100% 50%,75% 94%,25% 94%,0% 50%'},
+    play:    {clip:'35% 0%,65% 0%,65% 35%,100% 35%,100% 65%,65% 65%,65% 100%,35% 100%,35% 65%,0% 65%,0% 35%,35% 35%'},
+    active:  {clip:'30% 0%,70% 0%,100% 30%,100% 70%,70% 100%,30% 100%,0% 70%,0% 30%'}
+  };
+  function shapeLayerCss(size, color, cfg){
+    var shape = cfg.clip ? ('clip-path:polygon(' + cfg.clip + ');') : ('border-radius:' + (cfg.r || '50%') + ';');
+    return 'position:absolute;top:50%;left:50%;width:' + size + 'px;height:' + size + 'px;' +
+      'transform:translate(-50%,-50%)' + (cfg.rot ? ' rotate(' + cfg.rot + 'deg)' : '') + ';' +
+      'background:' + color + ';' + shape;
+  }
+  function tagPinHtml(tag, color){
+    var ink = '#2e2418';
+    if(tag === 'rain'){
+      return '<div style="position:relative;width:20px;height:20px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.45));">' +
+        '<div style="' + shapeLayerCss(20, ink, {r:'50%'}) + '"></div>' +
+        '<div style="' + shapeLayerCss(15, color, {r:'50%'}) + '"></div>' +
+        '<div style="' + shapeLayerCss(7, '#fdf6e6', {r:'50%'}) + '"></div>' +
+        '</div>';
+    }
+    var cfg = TAG_SHAPES[tag] || {r:'50%'};
+    return '<div style="position:relative;width:20px;height:20px;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.45));">' +
+      '<div style="' + shapeLayerCss(20, ink, cfg) + '"></div>' +
+      '<div style="' + shapeLayerCss(15, color, cfg) + '"></div>' +
+      '</div>';
+  }
 
   function projectPoint(lat, lng){
     var xr = (lng - MAP_BOUNDS.minLng) / (MAP_BOUNDS.maxLng - MAP_BOUNDS.minLng);
@@ -1846,8 +1876,8 @@
     ACTIVITIES.forEach(function(a){
       var color = TAG_COLORS[a.tag] || '#8f6039';
       var icon = L.divIcon({
-        html: '<div style="width:14px;height:14px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:' + color + ';border:1.5px solid #fdf6e6;box-shadow:0 1px 3px rgba(0,0,0,0.4);"></div>',
-        className: '', iconSize:[14,14], iconAnchor:[7,14]
+        html: tagPinHtml(a.tag, color),
+        className: '', iconSize:[20,20], iconAnchor:[10,10]
       });
       var slug = slugify(a.name);
       var dirUrl = 'https://www.google.com/maps/dir/?api=1&origin=' + HOME.lat + ',' + HOME.lng + '&destination=' + a.lat + ',' + a.lng + '&destination_place_id=' + a.placeId;
