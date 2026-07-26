@@ -1,5 +1,5 @@
-var CACHE_NAME = 'osterlen-v2';
-var SHELL = ['./osterlen.html', './manifest.json', './icon.svg'];
+var CACHE_NAME = 'osterlen-v3';
+var SHELL = ['./osterlen.html', './manifest.json', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', function(e){
   e.waitUntil(
