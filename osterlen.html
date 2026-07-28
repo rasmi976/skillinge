@@ -1808,6 +1808,7 @@
     var card = document.getElementById('act-card-' + slug);
     if(!card) return;
     card.classList.add('open');
+    openCardSlugs[slug] = true;
     card.querySelector('.act-head') && card.querySelector('.act-head').setAttribute('aria-expanded', 'true');
     card.classList.remove('hidden');
     card.scrollIntoView({behavior:'smooth', block:'center'});
@@ -2002,11 +2003,14 @@
     }
   }
 
+  var openCardSlugs = {};
+
   function buildActivityCard(a, opts){
     opts = opts || {};
+    var slug = slugify(a.name);
     var card = document.createElement('div');
-    card.className = 'act-card';
-    card.id = 'act-card-' + slugify(a.name);
+    card.className = 'act-card' + (openCardSlugs[slug] ? ' open' : '');
+    card.id = 'act-card-' + slug;
     card.dataset.tag = a.tag;
     card.dataset.kids = a.kidsLevel || '';
     var mapUrl = opts.mapMode === 'search'
@@ -2014,7 +2018,7 @@
       : 'https://www.google.com/maps/dir/?api=1&origin=' + HOME.lat + ',' + HOME.lng + '&destination=' + a.lat + ',' + a.lng + '&destination_place_id=' + (a.placeId || '');
     var mapLabel = opts.mapMode === 'search' ? 'Visa på karta' : 'Vägbeskrivning';
     card.innerHTML =
-      '<button class="act-head" aria-expanded="false">' +
+      '<button class="act-head" aria-expanded="' + (openCardSlugs[slug] ? 'true' : 'false') + '">' +
         '<span class="act-name"></span>' +
         '<span class="badge ' + a.tag + '"></span>' +
         '<span class="act-chevron">&#9662;</span>' +
@@ -2045,7 +2049,9 @@
     renderStarRating(card.querySelector('.star-rating'), a.name);
     card.querySelector('.act-head').addEventListener('click', function(){
       card.classList.toggle('open');
-      this.setAttribute('aria-expanded', card.classList.contains('open') ? 'true' : 'false');
+      var isOpen = card.classList.contains('open');
+      this.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      if(isOpen){ openCardSlugs[slug] = true; } else { delete openCardSlugs[slug]; }
     });
     card.querySelector('.act-add').addEventListener('click', function(e){
       e.stopPropagation();
