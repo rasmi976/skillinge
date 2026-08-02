@@ -842,6 +842,10 @@
     if(text){
       try{
         var fresh = JSON.parse(text);
+        if(fresh.movedTo){
+          await switchToBucket(fresh.movedTo);
+          return;
+        }
         fresh.schedule = fresh.schedule || [];
         fresh.votes = fresh.votes || {};
         fresh.ratings = fresh.ratings || {};
@@ -849,6 +853,8 @@
         fresh.checkins = fresh.checkins || {};
         state = fresh;
         render();
+        saveLocalBackup(text);
+        maybeRotate();
       }catch(e){}
     }
   }
@@ -2355,23 +2361,58 @@
   var BUCKET_ID = null;
   var BUCKET_PARAM = "b";
   var BUCKET_STORAGE_KEY = 'osterlen_bucket';
+  var BACKUP_STORAGE_KEY = 'osterlen_backup';
   var saveFailCount = 0;
+  var bucketExpiresAt = null;
+  var rotationInProgress = false;
+  // jsonblob raderar varje blob vid en fast tidpunkt som sätts när den skapas (går inte att förlänga).
+  // När det är mindre än så här kvar skapar sidan proaktivt en ny blob, kopierar all data och
+  // lämnar en flyttlapp (movedTo) i den gamla så alla klienter följer med automatiskt.
+  var ROTATE_BEFORE_MS = 12 * 60 * 60 * 1000;
+
+  function saveLocalBackup(text){
+    try{ localStorage.setItem(BACKUP_STORAGE_KEY, JSON.stringify({t: Date.now(), state: text})); }catch(e){}
+  }
+
+  function loadLocalBackup(){
+    try{
+      var raw = localStorage.getItem(BACKUP_STORAGE_KEY);
+      if(!raw) return null;
+      var parsed = JSON.parse(raw);
+      return (parsed && parsed.state) ? parsed : null;
+    }catch(e){ return null; }
+  }
+
+  function normalizeState(s){
+    s.schedule = s.schedule || defaultSchedule();
+    s.votes = s.votes || {};
+    s.ratings = s.ratings || {};
+    s.shopping = s.shopping || [];
+    s.checkins = s.checkins || {};
+    return s;
+  }
 
   async function bucketExists(id){
     try{
       var res = await fetch('https://jsonblob.com/api/jsonBlob/' + id, { headers: { 'Accept': 'application/json' } });
+      if(res.ok){
+        bucketExpiresAt = res.headers.get('X-jsonblob-expires-at');
+      }
       return res.ok;
     }catch(e){
       return false;
     }
   }
 
-  async function createNewBucket(){
-    var initial = { schedule: defaultSchedule(), votes: {}, ratings: {}, shopping: [], checkins: {}, seeded: true };
+  async function createNewBucket(seedText){
+    var body = seedText;
+    if(!body){
+      body = JSON.stringify({ schedule: defaultSchedule(), votes: {}, ratings: {}, shopping: [], checkins: {}, seeded: true });
+    }
     var res = await fetch('https://jsonblob.com/api/jsonBlob', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(initial)
+      body: body
     });
     var loc = res.headers.get('Location') || res.headers.get('location');
     var id = loc ? loc.split('/').filter(Boolean).pop() : null;
@@ -2388,44 +2429,103 @@
     window.history.replaceState({}, '', window.location.pathname + '?' + params.toString());
   }
 
+  function adoptBucketId(id){
+    BUCKET_ID = id;
+    try{ localStorage.setItem(BUCKET_STORAGE_KEY, id); }catch(e){}
+    setBucketInUrl(id);
+    var tag = document.getElementById('group-code-indicator');
+    if(tag) tag.textContent = 'Grupp: …' + id.slice(-6);
+  }
+
+  async function switchToBucket(id){
+    adoptBucketId(id);
+    var text = await remoteGet();
+    if(text){
+      try{
+        var parsed = JSON.parse(text);
+        if(!parsed.movedTo){
+          state = normalizeState(parsed);
+          render();
+          saveLocalBackup(text);
+        }
+      }catch(e){}
+    }
+  }
+
+  async function maybeRotate(){
+    if(rotationInProgress) return;
+    if(!BUCKET_ID || BUCKET_ID.indexOf('local-') === 0) return;
+    if(!bucketExpiresAt) return;
+    var msLeft = new Date(bucketExpiresAt).getTime() - Date.now();
+    if(isNaN(msLeft) || msLeft > ROTATE_BEFORE_MS) return;
+    rotationInProgress = true;
+    try{
+      // Kolla först om någon annan i gruppen redan hunnit flytta
+      var freshText = await remoteGet();
+      if(freshText){
+        try{
+          var fresh = JSON.parse(freshText);
+          if(fresh.movedTo){ await switchToBucket(fresh.movedTo); return; }
+        }catch(e){}
+      }
+      var carry = freshText || JSON.stringify(state);
+      var newId = await createNewBucket(carry);
+      if(!newId || newId.indexOf('local-') === 0) return;
+      var oldId = BUCKET_ID;
+      await fetch('https://jsonblob.com/api/jsonBlob/' + oldId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ movedTo: newId })
+      });
+      await switchToBucket(newId);
+    }catch(e){
+    }finally{
+      rotationInProgress = false;
+    }
+  }
+
   async function ensureBucket(){
     var params = new URLSearchParams(window.location.search);
-    var candidate = params.get(BUCKET_PARAM);
-    var candidateFromUrl = !!candidate;
-    if(!candidate){
-      try{ candidate = localStorage.getItem(BUCKET_STORAGE_KEY); }catch(e){}
-    }
-    if(candidate && candidate.indexOf('local-') !== 0){
-      var ok = await bucketExists(candidate);
-      if(ok){
-        BUCKET_ID = candidate;
-        try{ localStorage.setItem(BUCKET_STORAGE_KEY, candidate); }catch(e){}
-        if(!candidateFromUrl) setBucketInUrl(candidate);
+    var urlId = params.get(BUCKET_PARAM);
+    var remembered = null;
+    try{ remembered = localStorage.getItem(BUCKET_STORAGE_KEY); }catch(e){}
+    var candidates = [];
+    if(urlId) candidates.push(urlId);
+    if(remembered && remembered !== urlId) candidates.push(remembered);
+    for(var i = 0; i < candidates.length; i++){
+      var c = candidates[i];
+      if(c.indexOf('local-') === 0){
+        BUCKET_ID = c;
         return true;
       }
-    } else if(candidate){
-      BUCKET_ID = candidate;
-      return true;
+      if(await bucketExists(c)){
+        adoptBucketId(c);
+        return true;
+      }
     }
-    var hadOldLink = !!candidate;
+    var hadOldLink = candidates.length > 0;
+    var backup = loadLocalBackup();
     try{
-      var id = await createNewBucket();
-      BUCKET_ID = id;
-      try{ localStorage.setItem(BUCKET_STORAGE_KEY, id); }catch(e){}
-      setBucketInUrl(id);
-      showBucketBanner(hadOldLink);
+      var id = await createNewBucket(backup ? backup.state : null);
+      adoptBucketId(id);
+      showBucketBanner(hadOldLink, !!backup);
       return true;
     }catch(e){
       return false;
     }
   }
 
-  function showBucketBanner(wasExpired){
+  function showBucketBanner(wasExpired, restoredFromBackup){
     var banner = document.createElement('div');
-    banner.style.cssText = 'position:fixed; left:12px; right:12px; bottom:12px; z-index:9999; background:' + (wasExpired ? '#8f2e26' : '#2f6f5e') + '; color:#fdf6e6; padding:14px 16px; border-radius:10px; font-size:13px; box-shadow:0 6px 20px rgba(0,0,0,0.35); max-width:480px; margin:0 auto;';
-    var msg = wasExpired
-      ? 'Den gamla delade listan gick inte att hitta längre (togs bort hos lagringstjänsten) och tidigare data kunde tyvärr inte återställas. En <b>ny</b> delad lista har skapats.'
-      : 'Länken är nu unik för er grupp.';
+    banner.style.cssText = 'position:fixed; left:12px; right:12px; bottom:12px; z-index:9999; background:' + (wasExpired && !restoredFromBackup ? '#8f2e26' : '#2f6f5e') + '; color:#fdf6e6; padding:14px 16px; border-radius:10px; font-size:13px; box-shadow:0 6px 20px rgba(0,0,0,0.35); max-width:480px; margin:0 auto;';
+    var msg;
+    if(wasExpired && restoredFromBackup){
+      msg = 'Den delade listan hade försvunnit hos lagringstjänsten, men all data återställdes från en säkerhetskopia på den här enheten. En ny delad länk har skapats.';
+    } else if(wasExpired){
+      msg = 'Den gamla delade listan gick inte att hitta längre (togs bort hos lagringstjänsten) och tidigare data kunde tyvärr inte återställas. En <b>ny</b> delad lista har skapats.';
+    } else {
+      msg = 'Länken är nu unik för er grupp.';
+    }
     banner.innerHTML = msg + ' Kopiera adressen i adressfältet och skicka <b>den</b> länken till resten av familjen, så ser alla samma information. <button id="banner-close" style="margin-left:10px; background:rgba(255,255,255,0.2); border:none; color:#fdf6e6; padding:4px 10px; border-radius:5px; cursor:pointer;">OK</button>';
     document.body.appendChild(banner);
     document.getElementById('banner-close').addEventListener('click', function(){ banner.remove(); });
@@ -2446,6 +2546,7 @@
     try{
       var res = await fetch('https://jsonblob.com/api/jsonBlob/' + BUCKET_ID, { headers: { 'Accept': 'application/json' } });
       if(!res.ok) return null;
+      bucketExpiresAt = res.headers.get('X-jsonblob-expires-at');
       return await res.text();
     }catch(e){
       return null;
@@ -2467,6 +2568,7 @@
         return;
       }
       saveFailCount = 0;
+      saveLocalBackup(value);
     }catch(e){
       saveFailCount++;
       console.error('Kunde inte spara delat', e);
@@ -2490,13 +2592,15 @@
       var text = await remoteGet();
       if(text){
         try{
-          state = JSON.parse(text);
-          state.schedule = state.schedule || defaultSchedule();
-          state.votes = state.votes || {};
-          state.ratings = state.ratings || {};
-          state.shopping = state.shopping || [];
-          state.checkins = state.checkins || {};
+          var parsed = JSON.parse(text);
+          if(parsed.movedTo){
+            await switchToBucket(parsed.movedTo);
+            return;
+          }
+          state = normalizeState(parsed);
           render();
+          saveLocalBackup(text);
+          maybeRotate();
           return;
         }catch(e){}
       }
